@@ -11,7 +11,12 @@ import {
   Menu as MenuIcon,
   Plus,
   Moon,
-  Sun
+  Sun,
+  Bell,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  LogOut
 } from 'lucide-react';
 import { useLocalStorage } from '../hooks/use-local-storage';
 import { 
@@ -54,6 +59,15 @@ import {
   Tooltip, 
   Legend 
 } from 'recharts';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 // Types for our application
 type TransactionType = 'income' | 'expense';
@@ -93,6 +107,27 @@ interface CalendarEvent {
   type: TransactionType | 'invoice' | 'other';
   recurrence: 'once' | 'weekly' | 'monthly';
   description?: string;
+}
+
+interface PendingItem {
+  id: string;
+  title: string;
+  amount: number;
+  dueDate: string;
+  type: 'bill' | 'income' | 'goal';
+  isPaid: boolean;
+  isOverdue: boolean;
+}
+
+interface UserData {
+  username: string;
+  isLoggedIn: boolean;
+}
+
+// Props for the Dashboard
+interface DashboardProps {
+  onLogout: () => void;
+  user: UserData;
 }
 
 // Initial data
@@ -180,13 +215,63 @@ const initialCalendarEvents: CalendarEvent[] = [
   },
 ];
 
-const Dashboard = () => {
+// Sample pending items
+const initialPendingItems: PendingItem[] = [
+  {
+    id: '1',
+    title: 'Aluguel',
+    amount: 1200,
+    dueDate: '2023-12-10',
+    type: 'bill',
+    isPaid: false,
+    isOverdue: false
+  },
+  {
+    id: '2',
+    title: 'Energia Elétrica',
+    amount: 180,
+    dueDate: '2023-12-15',
+    type: 'bill',
+    isPaid: false,
+    isOverdue: false
+  },
+  {
+    id: '3',
+    title: 'Fatura do Cartão',
+    amount: 1500,
+    dueDate: '2023-12-20',
+    type: 'bill',
+    isPaid: false,
+    isOverdue: false
+  },
+  {
+    id: '4',
+    title: 'Salário',
+    amount: 5000,
+    dueDate: '2023-12-05',
+    type: 'income',
+    isPaid: true,
+    isOverdue: false
+  },
+  {
+    id: '5',
+    title: 'Conta de Água',
+    amount: 90,
+    dueDate: '2023-11-28',
+    type: 'bill',
+    isPaid: false,
+    isOverdue: true
+  }
+];
+
+const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
   // State management with localStorage persistence
   const [darkMode, setDarkMode] = useLocalStorage('darkMode', false);
   const [accounts, setAccounts] = useLocalStorage('accounts', initialAccounts);
   const [categories, setCategories] = useLocalStorage('categories', initialCategories);
   const [transactions, setTransactions] = useLocalStorage('transactions', initialTransactions);
   const [calendarEvents, setCalendarEvents] = useLocalStorage('calendarEvents', initialCalendarEvents);
+  const [pendingItems, setPendingItems] = useLocalStorage('pendingItems', initialPendingItems);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   const navigate = useNavigate();
@@ -222,35 +307,14 @@ const Dashboard = () => {
     })
     .filter(item => item.value > 0);
 
-  // Prepare data for line chart - monthly income/expense trends
-  const currentYear = new Date().getFullYear();
-  const months = Array.from({ length: 12 }, (_, i) => {
-    const date = new Date(currentYear, i, 1);
-    return date.toLocaleString('pt-BR', { month: 'short' });
-  });
-
-  const lineChartData = months.map((month, index) => {
-    const monthIndex = index;
-    const monthTransactions = transactions.filter(transaction => {
-      const transactionDate = new Date(transaction.date);
-      return transactionDate.getMonth() === monthIndex && 
-        transactionDate.getFullYear() === currentYear;
-    });
-
-    const monthIncome = monthTransactions
-      .filter(transaction => transaction.type === 'income')
-      .reduce((sum, transaction) => sum + transaction.amount, 0);
+  // Mark pending item as paid
+  const markAsPaid = (id: string) => {
+    setPendingItems(pendingItems.map(item => 
+      item.id === id ? { ...item, isPaid: true } : item
+    ));
     
-    const monthExpense = monthTransactions
-      .filter(transaction => transaction.type === 'expense')
-      .reduce((sum, transaction) => sum + transaction.amount, 0);
-
-    return {
-      name: month,
-      receitas: monthIncome,
-      despesas: monthExpense,
-    };
-  });
+    showNotification("Item marcado como pago");
+  };
 
   // Toggle dark mode
   const toggleDarkMode = () => {
@@ -330,6 +394,35 @@ const Dashboard = () => {
             </NavigationMenu>
           </nav>
 
+          {/* User account dropdown */}
+          <div className="hidden md:flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 rounded-full p-1 hover:bg-accent transition-colors focus:outline-none">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src="" alt={user.username} />
+                    <AvatarFallback className="bg-primary text-white">
+                      {user.username.substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="hidden md:inline-block">{user.username}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigateTo('/settings')}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Configurações</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onLogout} className="text-destructive focus:text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Sair</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
           {/* Mobile menu button */}
           <button 
             className="md:hidden flex items-center" 
@@ -372,6 +465,29 @@ const Dashboard = () => {
                 onClick={() => navigateTo('/settings')}
               >
                 Configurações
+              </button>
+              
+              <Separator />
+              
+              <div className="px-4 py-2">
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-primary text-white">
+                      {user.username.substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span>{user.username}</span>
+                </div>
+              </div>
+              
+              <button 
+                className="text-left px-4 py-2 hover:bg-accent rounded-md text-destructive"
+                onClick={onLogout}
+              >
+                <div className="flex items-center gap-2">
+                  <LogOut className="h-4 w-4" />
+                  <span>Sair</span>
+                </div>
               </button>
             </div>
           </div>
@@ -418,7 +534,7 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Charts */}
+        {/* Charts and pending items */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Pie chart */}
           <Card>
@@ -463,52 +579,82 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          {/* Line chart */}
+          {/* Pending items */}
           <Card>
             <CardHeader>
-              <CardTitle>Evolução Financeira</CardTitle>
-              <CardDescription>Receitas e despesas ao longo do ano</CardDescription>
+              <CardTitle>Pendências</CardTitle>
+              <CardDescription>Contas a pagar, receber e metas</CardDescription>
             </CardHeader>
-            <CardContent className="h-80">
-              <ChartContainer
-                config={{
-                  receitas: { label: "Receitas", color: "#10B981" },
-                  despesas: { label: "Despesas", color: "#EF4444" },
-                }}
-                className="h-full"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsLineChart
-                    data={lineChartData}
-                    margin={{
-                      top: 5,
-                      right: 30,
-                      left: 20,
-                      bottom: 5,
-                    }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis 
-                      tickFormatter={(value) => `R$ ${value}`}
-                    />
-                    <Tooltip
-                      formatter={(value) => [
-                        value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-                        'Valor'
-                      ]}
-                    />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="receitas"
-                      stroke="#10B981"
-                      activeDot={{ r: 8 }}
-                    />
-                    <Line type="monotone" dataKey="despesas" stroke="#EF4444" />
-                  </RechartsLineChart>
-                </ResponsiveContainer>
-              </ChartContainer>
+            <CardContent className="h-80 overflow-y-auto">
+              <div className="space-y-4">
+                {pendingItems.length > 0 ? (
+                  pendingItems.map((item) => (
+                    <div 
+                      key={item.id} 
+                      className={`border p-4 rounded-lg ${
+                        item.isPaid ? 'border-green-200 bg-green-50 dark:bg-green-900/20' :
+                        item.isOverdue ? 'border-red-200 bg-red-50 dark:bg-red-900/20' : 
+                        'border-gray-200 dark:border-gray-700'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start gap-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            {item.type === 'bill' ? (
+                              <AlertCircle className={`h-4 w-4 ${item.isPaid ? 'text-green-500' : item.isOverdue ? 'text-red-500' : 'text-orange-500'}`} />
+                            ) : item.type === 'income' ? (
+                              <DollarSign className={`h-4 w-4 ${item.isPaid ? 'text-green-500' : 'text-blue-500'}`} />
+                            ) : (
+                              <Bell className={`h-4 w-4 ${item.isPaid ? 'text-green-500' : 'text-purple-500'}`} />
+                            )}
+                            <h4 className="font-medium">{item.title}</h4>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            <span>Vencimento: {new Date(item.dueDate).toLocaleDateString('pt-BR')}</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className={`font-medium ${
+                            item.type === 'income' ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {(item.type === 'income' ? '+' : '-') + 
+                              item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                            }
+                          </span>
+                          {!item.isPaid && (
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="h-auto p-0 mt-1"
+                              onClick={() => markAsPaid(item.id)}
+                            >
+                              Marcar como pago
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      {item.isPaid && (
+                        <div className="flex items-center gap-1 mt-2 text-sm text-green-600">
+                          <CheckCircle className="h-3 w-3" />
+                          <span>Pago</span>
+                        </div>
+                      )}
+                      {item.isOverdue && !item.isPaid && (
+                        <div className="flex items-center gap-1 mt-2 text-sm text-red-600">
+                          <AlertCircle className="h-3 w-3" />
+                          <span>Atrasado</span>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-10 text-muted-foreground">
+                    <Bell className="mx-auto h-12 w-12 opacity-20 mb-2" />
+                    <p>Nenhuma pendência no momento</p>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -3,8 +3,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocalStorage } from "./hooks/use-local-storage";
+import LoginForm from "./components/LoginForm";
 import Index from "./pages/Index";
 import AccountsCategories from "./pages/AccountsCategories";
 import Calendar from "./pages/Calendar";
@@ -15,6 +17,9 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => {
+  // State for authentication
+  const [user, setUser] = useLocalStorage("user", { username: "", isLoggedIn: false });
+  
   // Initialize dark mode from localStorage on app load
   useEffect(() => {
     const darkMode = JSON.parse(localStorage.getItem("darkMode") || "false");
@@ -25,20 +30,34 @@ const App = () => {
     }
   }, []);
 
+  // Handle login
+  const handleLogin = (userData: { username: string; isLoggedIn: boolean }) => {
+    setUser(userData);
+  };
+
+  // Handle logout
+  const handleLogout = () => {
+    setUser({ username: "", isLoggedIn: false });
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/accounts-categories" element={<AccountsCategories />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          {!user.isLoggedIn ? (
+            <LoginForm onLogin={handleLogin} />
+          ) : (
+            <Routes>
+              <Route path="/" element={<Index onLogout={handleLogout} user={user} />} />
+              <Route path="/accounts-categories" element={<AccountsCategories />} />
+              <Route path="/calendar" element={<Calendar />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/settings" element={<Settings onLogout={handleLogout} />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          )}
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

@@ -14,7 +14,8 @@ import {
   DollarSign,
   Menu as MenuIcon,
   Moon,
-  Sun
+  Sun,
+  X
 } from 'lucide-react';
 import { useLocalStorage } from '../hooks/use-local-storage';
 import { 
@@ -67,6 +68,12 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // Types
 type TransactionType = 'income' | 'expense';
@@ -146,6 +153,10 @@ const AccountsCategories = () => {
     budget: 0,
   });
 
+  // Dialog states
+  const [accountDialogOpen, setAccountDialogOpen] = useState(false);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+
   // Toggle dark mode
   const toggleDarkMode = () => {
     document.documentElement.classList.toggle('dark');
@@ -218,6 +229,7 @@ const AccountsCategories = () => {
       color: '#3B82F6',
     });
     
+    setAccountDialogOpen(false);
     showNotification("Conta adicionada com sucesso");
   };
 
@@ -239,6 +251,7 @@ const AccountsCategories = () => {
       budget: 0,
     });
     
+    setCategoryDialogOpen(false);
     showNotification("Categoria adicionada com sucesso");
   };
 
@@ -416,152 +429,181 @@ const AccountsCategories = () => {
           {/* Accounts Tab */}
           <TabsContent value="accounts">
             <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Adicionar Nova Conta</CardTitle>
-                  <CardDescription>
-                    Crie uma nova conta bancária, carteira ou cartão de crédito
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="name">Nome da Conta</Label>
-                      <Input 
-                        id="name" 
-                        name="name"
-                        placeholder="Ex: Nubank, Carteira, etc." 
-                        value={newAccount.name}
-                        onChange={handleAccountChange}
-                      />
-                    </div>
+              {/* Quick Add Button */}
+              <div className="flex justify-center md:justify-end">
+                <Button 
+                  className="w-full md:w-auto"
+                  onClick={() => setAccountDialogOpen(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Adicionar Nova Conta
+                </Button>
+              </div>
 
-                    <div className="grid gap-2">
-                      <Label htmlFor="balance">Saldo Inicial</Label>
-                      <Input 
-                        id="balance" 
-                        name="balance"
-                        type="number" 
-                        placeholder="0.00" 
-                        value={newAccount.balance}
-                        onChange={handleAccountChange}
-                      />
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="type">Tipo</Label>
-                      <Select 
-                        defaultValue={newAccount.type}
-                        onValueChange={(value) => setNewAccount({...newAccount, type: value as AccountType})}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="bank">Conta Bancária</SelectItem>
-                          <SelectItem value="cash">Dinheiro em Espécie</SelectItem>
-                          <SelectItem value="credit">Cartão de Crédito</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="color">Cor</Label>
-                      <Select 
-                        defaultValue={newAccount.color}
-                        onValueChange={(value) => setNewAccount({...newAccount, color: value})}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a cor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {colorOptions.map(color => (
-                            <SelectItem key={color.value} value={color.value}>
-                              <div className="flex items-center gap-2">
-                                <div 
-                                  className="w-4 h-4 rounded-full" 
-                                  style={{ backgroundColor: color.value }}
-                                />
-                                {color.name}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="description">Descrição (opcional)</Label>
-                      <Input 
-                        id="description" 
-                        name="description"
-                        placeholder="Descrição ou notas sobre esta conta" 
-                        value={newAccount.description || ''}
-                        onChange={handleAccountChange}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full" onClick={addAccount}>
-                    <Plus className="mr-2 h-4 w-4" /> Adicionar Conta
-                  </Button>
-                </CardFooter>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Minhas Contas</CardTitle>
-                  <CardDescription>
-                    Gerencie suas contas e saldos
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {accounts.length === 0 ? (
-                      <p className="text-center text-muted-foreground">
-                        Nenhuma conta adicionada ainda.
+              {/* Accounts List */}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {accounts.length === 0 ? (
+                  <Card className="col-span-full">
+                    <CardContent className="pt-6 text-center">
+                      <p className="text-muted-foreground">
+                        Nenhuma conta adicionada ainda. Clique em "Adicionar Nova Conta" para começar.
                       </p>
-                    ) : (
-                      accounts.map(account => (
-                        <div 
-                          key={account.id} 
-                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/30 cursor-pointer"
-                          onClick={() => setEditingAccount(account)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div 
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-white"
-                              style={{ backgroundColor: account.color }}
-                            >
-                              {getAccountIcon(account.type)}
-                            </div>
-                            <div>
-                              <h4 className="font-medium">{account.name}</h4>
-                              <p className="text-sm text-muted-foreground">
-                                {account.type === 'bank' ? 'Conta Bancária' : 
-                                 account.type === 'cash' ? 'Dinheiro em Espécie' : 
-                                 'Cartão de Crédito'}
-                              </p>
-                            </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  accounts.map(account => (
+                    <Card 
+                      key={account.id} 
+                      className="group hover:shadow-md transition-all duration-200"
+                    >
+                      <CardHeader className="pb-2 relative">
+                        <div className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => setEditingAccount(account)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Editar conta
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div 
+                            className="w-10 h-10 rounded-full flex items-center justify-center text-white"
+                            style={{ backgroundColor: account.color }}
+                          >
+                            {getAccountIcon(account.type)}
                           </div>
-                          <div className="text-right">
-                            <p className={`font-medium ${account.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {account.balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                            </p>
+                          <div>
+                            <CardTitle className="text-base">{account.name}</CardTitle>
+                            <CardDescription>
+                              {account.type === 'bank' ? 'Conta Bancária' : 
+                               account.type === 'cash' ? 'Dinheiro em Espécie' : 
+                               'Cartão de Crédito'}
+                            </CardDescription>
                           </div>
                         </div>
-                      ))
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                      </CardHeader>
+                      <CardContent>
+                        <p className={`text-xl font-bold ${account.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {account.balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </p>
+                        {account.description && (
+                          <p className="text-sm text-muted-foreground mt-1">{account.description}</p>
+                        )}
+                      </CardContent>
+                      <CardFooter className="pt-0">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-primary hover:text-primary/90"
+                          onClick={() => setEditingAccount(account)}
+                        >
+                          Gerenciar Conta
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  ))
+                )}
+              </div>
             </div>
+
+            {/* Add Account Dialog */}
+            <Dialog open={accountDialogOpen} onOpenChange={setAccountDialogOpen}>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Adicionar Nova Conta</DialogTitle>
+                  <DialogDescription>
+                    Crie uma nova conta bancária, carteira ou cartão de crédito
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="name">Nome da Conta</Label>
+                    <Input 
+                      id="name" 
+                      name="name"
+                      placeholder="Ex: Nubank, Carteira, etc." 
+                      value={newAccount.name}
+                      onChange={handleAccountChange}
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="balance">Saldo Inicial</Label>
+                    <Input 
+                      id="balance" 
+                      name="balance"
+                      type="number" 
+                      placeholder="0.00" 
+                      value={newAccount.balance}
+                      onChange={handleAccountChange}
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="type">Tipo</Label>
+                    <Select 
+                      defaultValue={newAccount.type}
+                      onValueChange={(value) => setNewAccount({...newAccount, type: value as AccountType})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bank">Conta Bancária</SelectItem>
+                        <SelectItem value="cash">Dinheiro em Espécie</SelectItem>
+                        <SelectItem value="credit">Cartão de Crédito</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="color">Cor</Label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {colorOptions.map(color => (
+                        <div 
+                          key={color.value}
+                          className={`w-full aspect-square rounded-md cursor-pointer border-2 ${
+                            newAccount.color === color.value ? 'border-primary' : 'border-transparent'
+                          }`}
+                          style={{ backgroundColor: color.value }}
+                          onClick={() => setNewAccount({...newAccount, color: color.value})}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="description">Descrição (opcional)</Label>
+                    <Input 
+                      id="description" 
+                      name="description"
+                      placeholder="Descrição ou notas sobre esta conta" 
+                      value={newAccount.description || ''}
+                      onChange={handleAccountChange}
+                    />
+                  </div>
+                </div>
+                <DialogFooter className="flex gap-2">
+                  <Button variant="outline" onClick={() => setAccountDialogOpen(false)}>Cancelar</Button>
+                  <Button onClick={addAccount}>Adicionar Conta</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             {/* Edit Account Dialog */}
             {editingAccount && (
               <Dialog open={!!editingAccount} onOpenChange={() => setEditingAccount(null)}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-[425px]">
                   <DialogHeader>
                     <DialogTitle>Editar Conta</DialogTitle>
                     <DialogDescription>
@@ -613,30 +655,18 @@ const AccountsCategories = () => {
 
                     <div className="grid gap-2">
                       <Label htmlFor="edit-color">Cor</Label>
-                      <Select 
-                        value={editingAccount.color}
-                        onValueChange={(value) => setEditingAccount({
-                          ...editingAccount, 
-                          color: value
-                        })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a cor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {colorOptions.map(color => (
-                            <SelectItem key={color.value} value={color.value}>
-                              <div className="flex items-center gap-2">
-                                <div 
-                                  className="w-4 h-4 rounded-full" 
-                                  style={{ backgroundColor: color.value }}
-                                />
-                                {color.name}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="grid grid-cols-4 gap-2">
+                        {colorOptions.map(color => (
+                          <div 
+                            key={color.value}
+                            className={`w-full aspect-square rounded-md cursor-pointer border-2 ${
+                              editingAccount.color === color.value ? 'border-primary' : 'border-transparent'
+                            }`}
+                            style={{ backgroundColor: color.value }}
+                            onClick={() => setEditingAccount({...editingAccount, color: color.value})}
+                          />
+                        ))}
+                      </div>
                     </div>
 
                     <div className="grid gap-2">
@@ -672,145 +702,187 @@ const AccountsCategories = () => {
           {/* Categories Tab */}
           <TabsContent value="categories">
             <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Adicionar Nova Categoria</CardTitle>
-                  <CardDescription>
-                    Crie uma nova categoria para suas transações
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="cat-name">Nome da Categoria</Label>
-                      <Input 
-                        id="cat-name" 
-                        name="name"
-                        placeholder="Ex: Alimentação, Transporte, etc." 
-                        value={newCategory.name}
-                        onChange={handleCategoryChange}
-                      />
-                    </div>
+              {/* Quick Add Button */}
+              <div className="flex justify-center md:justify-end">
+                <Button 
+                  className="w-full md:w-auto"
+                  onClick={() => setCategoryDialogOpen(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Adicionar Nova Categoria
+                </Button>
+              </div>
 
-                    <div className="grid gap-2">
-                      <Label htmlFor="cat-type">Tipo</Label>
-                      <Select 
-                        defaultValue={newCategory.type}
-                        onValueChange={(value) => setNewCategory({
-                          ...newCategory, 
-                          type: value as TransactionType
-                        })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="income">Receita</SelectItem>
-                          <SelectItem value="expense">Despesa</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+              {/* Categories tabs by type */}
+              <Tabs defaultValue="expense" className="w-full">
+                <TabsList className="w-full mb-4">
+                  <TabsTrigger value="expense" className="flex-1">Despesas</TabsTrigger>
+                  <TabsTrigger value="income" className="flex-1">Receitas</TabsTrigger>
+                </TabsList>
 
-                    <div className="grid gap-2">
-                      <Label htmlFor="cat-color">Cor</Label>
-                      <Select 
-                        defaultValue={newCategory.color}
-                        onValueChange={(value) => setNewCategory({...newCategory, color: value})}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a cor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {colorOptions.map(color => (
-                            <SelectItem key={color.value} value={color.value}>
-                              <div className="flex items-center gap-2">
-                                <div 
-                                  className="w-4 h-4 rounded-full" 
-                                  style={{ backgroundColor: color.value }}
-                                />
-                                {color.name}
+                {['expense', 'income'].map((type) => (
+                  <TabsContent key={type} value={type} className="mt-0">
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {categories
+                        .filter(category => category.type === type)
+                        .map(category => (
+                          <Card 
+                            key={category.id} 
+                            className="group hover:shadow-md transition-all duration-200"
+                          >
+                            <CardHeader className="pb-2 relative">
+                              <div className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7"
+                                        onClick={() => setEditingCategory(category)}
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      Editar categoria
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                              <div className="flex items-center gap-3">
+                                <div 
+                                  className="w-8 h-8 rounded-full"
+                                  style={{ backgroundColor: category.color }}
+                                />
+                                <div>
+                                  <CardTitle className="text-base">{category.name}</CardTitle>
+                                  <CardDescription>
+                                    {category.type === 'income' ? 'Receita' : 'Despesa'}
+                                  </CardDescription>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              {category.budget ? (
+                                <div>
+                                  <p className="text-sm text-muted-foreground">Orçamento:</p>
+                                  <p className="text-xl font-bold">
+                                    {category.budget.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                  </p>
+                                </div>
+                              ) : (
+                                <p className="text-sm text-muted-foreground">
+                                  Sem orçamento definido
+                                </p>
+                              )}
+                            </CardContent>
+                            <CardFooter className="pt-0">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-primary hover:text-primary/90"
+                                onClick={() => setEditingCategory(category)}
+                              >
+                                Gerenciar Categoria
+                              </Button>
+                            </CardFooter>
+                          </Card>
+                        ))}
 
-                    <div className="grid gap-2">
-                      <Label htmlFor="cat-budget">Orçamento (opcional)</Label>
-                      <Input 
-                        id="cat-budget" 
-                        name="budget"
-                        type="number" 
-                        placeholder="0.00" 
-                        value={newCategory.budget || ''}
-                        onChange={handleCategoryChange}
-                      />
+                      {categories.filter(category => category.type === type).length === 0 && (
+                        <Card className="col-span-full">
+                          <CardContent className="pt-6 text-center">
+                            <p className="text-muted-foreground">
+                              Nenhuma categoria de {type === 'expense' ? 'despesa' : 'receita'} adicionada ainda.
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
                     </div>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button className="w-full" onClick={addCategory}>
-                    <Plus className="mr-2 h-4 w-4" /> Adicionar Categoria
-                  </Button>
-                </CardFooter>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Minhas Categorias</CardTitle>
-                  <CardDescription>
-                    Gerencie suas categorias e orçamentos
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {categories.length === 0 ? (
-                      <p className="text-center text-muted-foreground">
-                        Nenhuma categoria adicionada ainda.
-                      </p>
-                    ) : (
-                      categories.map(category => (
-                        <div 
-                          key={category.id} 
-                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/30 cursor-pointer"
-                          onClick={() => setEditingCategory(category)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div 
-                              className="w-4 h-4 rounded-full"
-                              style={{ backgroundColor: category.color }}
-                            />
-                            <div>
-                              <h4 className="font-medium">{category.name}</h4>
-                              <p className="text-sm text-muted-foreground">
-                                {category.type === 'income' ? 'Receita' : 'Despesa'}
-                              </p>
-                            </div>
-                          </div>
-                          {category.budget ? (
-                            <div className="text-right">
-                              <p className="font-medium">
-                                Orçamento: {category.budget.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="text-right text-sm text-muted-foreground">
-                              Sem orçamento definido
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                  </TabsContent>
+                ))}
+              </Tabs>
             </div>
+
+            {/* Add Category Dialog */}
+            <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Adicionar Nova Categoria</DialogTitle>
+                  <DialogDescription>
+                    Crie uma nova categoria para suas transações
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="cat-name">Nome da Categoria</Label>
+                    <Input 
+                      id="cat-name" 
+                      name="name"
+                      placeholder="Ex: Alimentação, Transporte, etc." 
+                      value={newCategory.name}
+                      onChange={handleCategoryChange}
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="cat-type">Tipo</Label>
+                    <Select 
+                      defaultValue={newCategory.type}
+                      onValueChange={(value) => setNewCategory({
+                        ...newCategory, 
+                        type: value as TransactionType
+                      })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="income">Receita</SelectItem>
+                        <SelectItem value="expense">Despesa</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="cat-color">Cor</Label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {colorOptions.map(color => (
+                        <div 
+                          key={color.value}
+                          className={`w-full aspect-square rounded-md cursor-pointer border-2 ${
+                            newCategory.color === color.value ? 'border-primary' : 'border-transparent'
+                          }`}
+                          style={{ backgroundColor: color.value }}
+                          onClick={() => setNewCategory({...newCategory, color: color.value})}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="cat-budget">Orçamento</Label>
+                    <Input 
+                      id="cat-budget" 
+                      name="budget"
+                      type="number" 
+                      placeholder="0.00" 
+                      value={newCategory.budget || ''}
+                      onChange={handleCategoryChange}
+                    />
+                  </div>
+                </div>
+                <DialogFooter className="flex gap-2">
+                  <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>Cancelar</Button>
+                  <Button onClick={addCategory}>Adicionar Categoria</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             {/* Edit Category Dialog */}
             {editingCategory && (
               <Dialog open={!!editingCategory} onOpenChange={() => setEditingCategory(null)}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-[425px]">
                   <DialogHeader>
                     <DialogTitle>Editar Categoria</DialogTitle>
                     <DialogDescription>
@@ -850,30 +922,18 @@ const AccountsCategories = () => {
 
                     <div className="grid gap-2">
                       <Label htmlFor="edit-cat-color">Cor</Label>
-                      <Select 
-                        value={editingCategory.color}
-                        onValueChange={(value) => setEditingCategory({
-                          ...editingCategory, 
-                          color: value
-                        })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a cor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {colorOptions.map(color => (
-                            <SelectItem key={color.value} value={color.value}>
-                              <div className="flex items-center gap-2">
-                                <div 
-                                  className="w-4 h-4 rounded-full" 
-                                  style={{ backgroundColor: color.value }}
-                                />
-                                {color.name}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="grid grid-cols-4 gap-2">
+                        {colorOptions.map(color => (
+                          <div 
+                            key={color.value}
+                            className={`w-full aspect-square rounded-md cursor-pointer border-2 ${
+                              editingCategory.color === color.value ? 'border-primary' : 'border-transparent'
+                            }`}
+                            style={{ backgroundColor: color.value }}
+                            onClick={() => setEditingCategory({...editingCategory, color: color.value})}
+                          />
+                        ))}
+                      </div>
                     </div>
 
                     <div className="grid gap-2">
