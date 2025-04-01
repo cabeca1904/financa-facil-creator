@@ -81,7 +81,7 @@ interface CalendarEvent {
   title: string;
   date: string;
   amount: number;
-  type: TransactionType | 'invoice' | 'other';
+  type: 'income' | 'expense' | 'invoice' | 'other';
   recurrence: 'once' | 'weekly' | 'monthly';
   description?: string;
 }
@@ -204,6 +204,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
 
   // Convert calendar events to pending items
   React.useEffect(() => {
+    console.log("Calendar events in Index:", calendarEvents);
+    
     // Generate pending items from calendar events
     const eventsAsPendingItems = calendarEvents.map(event => {
       const today = new Date();
@@ -232,6 +234,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
     });
     
     setPendingItems(eventsAsPendingItems);
+    console.log("Generated pending items:", eventsAsPendingItems);
   }, [calendarEvents]);
 
   // Helper function to determine if an event is in the past
@@ -308,6 +311,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
       description: message,
     });
   };
+
+  // For debugging
+  React.useEffect(() => {
+    console.log("Pending items updated:", pendingItems);
+  }, [pendingItems]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">

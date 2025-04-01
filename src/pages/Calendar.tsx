@@ -182,32 +182,11 @@ const CalendarPage: React.FC = () => {
     }
   };
 
-  // Create a date renderer for the calendar
-  const renderDate = (day: Date) => {
-    const dateStr = format(day, 'yyyy-MM-dd');
-    const hasEvents = dateStr in datesWithEvents;
-    
-    return (
-      <div className="relative w-full h-full">
-        <div className={`absolute inset-0 flex items-center justify-center ${isToday(day) ? 'font-bold' : ''}`}>
-          {format(day, 'd')}
-        </div>
-        {hasEvents && (
-          <div className="absolute bottom-1 left-0 right-0 flex justify-center space-x-1">
-            {datesWithEvents[dateStr].slice(0, 3).map((event, i) => (
-              <div
-                key={i}
-                className={`h-1.5 w-1.5 rounded-full ${getEventTypeColor(event.type)}`}
-              />
-            ))}
-            {datesWithEvents[dateStr].length > 3 && (
-              <div className="h-1.5 w-1.5 rounded-full bg-gray-400" />
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
+  // Debug function to log events
+  useEffect(() => {
+    console.log("Current events:", events);
+    console.log("Dates with events:", datesWithEvents);
+  }, [events, datesWithEvents]);
 
   return (
     <div className="container mx-auto p-4">
@@ -238,7 +217,7 @@ const CalendarPage: React.FC = () => {
                 selected={selectedDate}
                 onSelect={handleDaySelect}
                 month={date}
-                className="w-full"
+                className="w-full pointer-events-auto"
                 disabled={false}
               />
             </div>
