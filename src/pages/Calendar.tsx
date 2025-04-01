@@ -40,6 +40,7 @@ const CalendarPage: React.FC = () => {
   const [isAddEventDialogOpen, setIsAddEventDialogOpen] = useState(false);
   const [isViewEventDialogOpen, setIsViewEventDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [currentDateEvents, setCurrentDateEvents] = useState<CalendarEvent[]>([]);
 
   // Form state for new events
   const [newEvent, setNewEvent] = useState<Omit<CalendarEvent, 'id'>>({
@@ -73,32 +74,32 @@ const CalendarPage: React.FC = () => {
     setDate(addMonths(date, 1));
   };
 
-  // Handle day selection
+  // Handle day selection - now only shows events for the selected day without opening add dialog
   const handleDaySelect = (day: Date | undefined) => {
     if (day) {
       setSelectedDate(day);
       
-      // Check if there are events on this day
+      // Update the events for the selected date
       const dayStr = format(day, 'yyyy-MM-dd');
-      const dayEvents = datesWithEvents[dayStr];
+      const dayEvents = datesWithEvents[dayStr] || [];
+      setCurrentDateEvents(dayEvents);
       
-      if (dayEvents && dayEvents.length === 1) {
-        // If only one event, show it directly
+      // If there are events for this day and user clicks on it, show the first event
+      if (dayEvents.length > 0) {
         setSelectedEvent(dayEvents[0]);
         setIsViewEventDialogOpen(true);
-      } else if (dayEvents && dayEvents.length > 1) {
-        // If multiple events, we could show a list, but for now just show the first one
-        setSelectedEvent(dayEvents[0]);
-        setIsViewEventDialogOpen(true);
-      } else {
-        // If no events, show the add event dialog
-        setNewEvent({
-          ...newEvent,
-          date: format(day, 'yyyy-MM-dd')
-        });
-        setIsAddEventDialogOpen(true);
       }
+      // We no longer automatically open the add event dialog
     }
+  };
+
+  // Explicitly open the add event dialog when the button is clicked
+  const handleAddEventClick = () => {
+    setNewEvent({
+      ...newEvent,
+      date: format(selectedDate || new Date(), 'yyyy-MM-dd')
+    });
+    setIsAddEventDialogOpen(true);
   };
 
   // Handle event creation
@@ -122,6 +123,11 @@ const CalendarPage: React.FC = () => {
       description: ''
     });
     
+    // Update current date events
+    if (selectedDate && format(selectedDate, 'yyyy-MM-dd') === event.date) {
+      setCurrentDateEvents([...currentDateEvents, event]);
+    }
+    
     toast({
       title: "Evento criado",
       description: "O evento foi adicionado ao calendário e às pendências."
@@ -130,8 +136,12 @@ const CalendarPage: React.FC = () => {
 
   // Handle event deletion
   const handleDeleteEvent = (id: string) => {
-    setEvents(events.filter(event => event.id !== id));
+    const updatedEvents = events.filter(event => event.id !== id);
+    setEvents(updatedEvents);
     setIsViewEventDialogOpen(false);
+    
+    // Update current date events
+    setCurrentDateEvents(currentDateEvents.filter(event => event.id !== id));
     
     toast({
       title: "Evento excluído",
@@ -142,10 +152,19 @@ const CalendarPage: React.FC = () => {
   // Handle event update
   const handleUpdateEvent = () => {
     if (selectedEvent) {
-      setEvents(events.map(event => 
+      const updatedEvents = events.map(event => 
         event.id === selectedEvent.id ? selectedEvent : event
-      ));
+      );
+      setEvents(updatedEvents);
       setIsViewEventDialogOpen(false);
+      
+      // Update current date events
+      if (selectedDate) {
+        const dayStr = format(selectedDate, 'yyyy-MM-dd');
+        setCurrentDateEvents(
+          updatedEvents.filter(event => event.date === dayStr)
+        );
+      }
       
       toast({
         title: "Evento atualizado",
@@ -154,13 +173,14 @@ const CalendarPage: React.FC = () => {
     }
   };
 
-  // Get events for the selected date
-  const getEventsForSelectedDate = () => {
-    if (!selectedDate) return [];
-    
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    return datesWithEvents[dateStr] || [];
-  };
+  // Update current date events when selected date changes
+  useEffect(() => {
+    if (selectedDate) {
+      const dayStr = format(selectedDate, 'yyyy-MM-dd');
+      const dayEvents = datesWithEvents[dayStr] || [];
+      setCurrentDateEvents(dayEvents);
+    }
+  }, [selectedDate, datesWithEvents]);
 
   // Get color for event type
   const getEventTypeColor = (type: string) => {
@@ -186,7 +206,8 @@ const CalendarPage: React.FC = () => {
   useEffect(() => {
     console.log("Current events:", events);
     console.log("Dates with events:", datesWithEvents);
-  }, [events, datesWithEvents]);
+    console.log("Current date events:", currentDateEvents);
+  }, [events, datesWithEvents, currentDateEvents]);
 
   return (
     <div className="container mx-auto p-4">
@@ -225,13 +246,7 @@ const CalendarPage: React.FC = () => {
           <CardFooter className="flex justify-end">
             <Button 
               className="flex items-center gap-2" 
-              onClick={() => {
-                setNewEvent({
-                  ...newEvent,
-                  date: format(selectedDate || new Date(), 'yyyy-MM-dd')
-                });
-                setIsAddEventDialogOpen(true);
-              }}
+              onClick={handleAddEventClick}
             >
               <Plus className="h-4 w-4" />
               Adicionar Evento
@@ -253,9 +268,9 @@ const CalendarPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-[300px]">
-              {getEventsForSelectedDate().length > 0 ? (
+              {currentDateEvents.length > 0 ? (
                 <div className="space-y-4">
-                  {getEventsForSelectedDate().map((event) => (
+                  {currentDateEvents.map((event) => (
                     <div 
                       key={event.id}
                       onClick={() => {
@@ -297,13 +312,7 @@ const CalendarPage: React.FC = () => {
                   <p>Nenhum evento para esta data</p>
                   <Button 
                     variant="link" 
-                    onClick={() => {
-                      setNewEvent({
-                        ...newEvent,
-                        date: format(selectedDate || new Date(), 'yyyy-MM-dd')
-                      });
-                      setIsAddEventDialogOpen(true);
-                    }}
+                    onClick={handleAddEventClick}
                   >
                     Adicionar evento
                   </Button>

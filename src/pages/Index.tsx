@@ -202,7 +202,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
   
   const navigate = useNavigate();
 
-  // Convert calendar events to pending items
+  // Convert calendar events to pending items with exact dates
   React.useEffect(() => {
     console.log("Calendar events in Index:", calendarEvents);
     
@@ -226,7 +226,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
         id: event.id,
         title: event.title,
         amount: event.amount,
-        dueDate: event.date,
+        dueDate: event.date, // Keep the exact date string from the event
         type: pendingItemType,
         isPaid: isPastEvent(event),
         isOverdue: isOverdue
