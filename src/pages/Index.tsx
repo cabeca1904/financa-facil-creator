@@ -1,11 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Calendar, 
   DollarSign, 
   PieChart, 
-  LineChart, 
   Settings, 
   FilePlus, 
   Plus,
@@ -25,8 +24,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import { Separator } from '@/components/ui/separator';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { 
   ChartContainer, 
   ChartLegend, 
@@ -37,17 +34,12 @@ import {
   PieChart as RechartsPieChart, 
   Pie, 
   Cell, 
-  LineChart as RechartsLineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
   Tooltip, 
   Legend 
 } from 'recharts';
 
 // Types for our application
-type TransactionType = 'income' | 'expense';
+type TransactionType = 'expense';
 type AccountType = 'bank' | 'cash' | 'credit';
 
 interface Transaction {
@@ -81,7 +73,7 @@ interface CalendarEvent {
   title: string;
   date: string;
   amount: number;
-  type: 'income' | 'expense' | 'invoice' | 'other';
+  type: 'expense' | 'invoice' | 'other';
   recurrence: 'once' | 'weekly' | 'monthly';
   description?: string;
 }
@@ -91,7 +83,7 @@ interface PendingItem {
   title: string;
   amount: number;
   dueDate: string;
-  type: 'bill' | 'income' | 'goal';
+  type: 'bill' | 'goal';
   isPaid: boolean;
   isOverdue: boolean;
 }
@@ -115,7 +107,6 @@ const initialAccounts: Account[] = [
 ];
 
 const initialCategories: Category[] = [
-  { id: '1', name: 'Salário', color: '#10B981', type: 'income', budget: 5000 },
   { id: '2', name: 'Alimentação', color: '#F59E0B', type: 'expense', budget: 1000 },
   { id: '3', name: 'Transporte', color: '#3B82F6', type: 'expense', budget: 500 },
   { id: '4', name: 'Moradia', color: '#8B5CF6', type: 'expense', budget: 1500 },
@@ -124,15 +115,6 @@ const initialCategories: Category[] = [
 ];
 
 const initialTransactions: Transaction[] = [
-  {
-    id: '1',
-    description: 'Salário',
-    amount: 5000,
-    date: '2023-12-05',
-    category: '1',
-    type: 'income',
-    accountId: '1',
-  },
   {
     id: '2',
     description: 'Supermercado',
@@ -173,15 +155,6 @@ const initialCalendarEvents: CalendarEvent[] = [
     description: 'Pagamento mensal do aluguel'
   },
   {
-    id: '2',
-    title: 'Salário',
-    date: '2023-12-05',
-    amount: 5000,
-    type: 'income',
-    recurrence: 'monthly',
-    description: 'Salário mensal'
-  },
-  {
     id: '3',
     title: 'Fatura Cartão',
     date: '2023-12-15',
@@ -203,7 +176,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
   const navigate = useNavigate();
 
   // Convert calendar events to pending items with exact dates
-  React.useEffect(() => {
+  useEffect(() => {
     console.log("Calendar events in Index:", calendarEvents);
     
     // Generate pending items from calendar events
@@ -213,10 +186,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
       const isOverdue = eventDate < today && !isPastEvent(event);
       
       // Map event type to PendingItem type
-      let pendingItemType: 'bill' | 'income' | 'goal';
-      if (event.type === 'income') {
-        pendingItemType = 'income';
-      } else if (event.type === 'invoice' || event.type === 'expense') {
+      let pendingItemType: 'bill' | 'goal';
+      if (event.type === 'invoice' || event.type === 'expense') {
         pendingItemType = 'bill';
       } else {
         pendingItemType = 'goal'; // Default for 'other' type
@@ -226,7 +197,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
         id: event.id,
         title: event.title,
         amount: event.amount,
-        dueDate: event.date, // Keep the exact date string from the event
+        dueDate: event.date,
         type: pendingItemType,
         isPaid: isPastEvent(event),
         isOverdue: isOverdue
@@ -259,16 +230,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
     return eventDate < today;
   };
 
-  // Calculate total balance, income, and expenses
+  // Calculate total balance and expenses
   const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
-  
-  const totalIncome = transactions
-    .filter(transaction => transaction.type === 'income')
-    .reduce((sum, transaction) => sum + transaction.amount, 0);
   
   const totalExpenses = transactions
     .filter(transaction => transaction.type === 'expense')
     .reduce((sum, transaction) => sum + transaction.amount, 0);
+
+  // Calculate total pending expenses
+  const totalPendingExpenses = pendingItems
+    .filter(item => !item.isPaid)
+    .reduce((sum, item) => sum + item.amount, 0);
 
   // Prepare data for pie chart - category distribution
   const categoryExpenseData = categories
@@ -312,11 +284,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
     });
   };
 
-  // For debugging
-  React.useEffect(() => {
-    console.log("Pending items updated:", pendingItems);
-  }, [pendingItems]);
-
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Main content */}
@@ -324,7 +291,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
         <h2 className="text-2xl font-bold mb-6">Visão Geral</h2>
 
         {/* Financial summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-lg">Saldo Total</CardTitle>
@@ -338,22 +305,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Receitas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-green-600">
-                {totalIncome.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
               <CardTitle className="text-lg">Despesas</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold text-red-600">
-                {totalExpenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                {totalPendingExpenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
               </p>
             </CardContent>
           </Card>
@@ -370,7 +326,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
             <CardContent className="h-80">
               <ChartContainer
                 config={{
-                  income: { label: "Receitas", color: "#10B981" },
                   expense: { label: "Despesas", color: "#EF4444" },
                 }}
                 className="h-full"
@@ -427,8 +382,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
                           <div className="flex items-center gap-2">
                             {item.type === 'bill' ? (
                               <AlertCircle className={`h-4 w-4 ${item.isPaid ? 'text-green-500' : item.isOverdue ? 'text-red-500' : 'text-orange-500'}`} />
-                            ) : item.type === 'income' ? (
-                              <DollarSign className={`h-4 w-4 ${item.isPaid ? 'text-green-500' : 'text-blue-500'}`} />
                             ) : (
                               <AlertCircle className={`h-4 w-4 ${item.isPaid ? 'text-green-500' : 'text-purple-500'}`} />
                             )}
@@ -440,12 +393,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
                           </div>
                         </div>
                         <div className="flex flex-col items-end">
-                          <span className={`font-medium ${
-                            item.type === 'income' ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {(item.type === 'income' ? '+' : '-') + 
-                              item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-                            }
+                          <span className="font-medium text-red-600">
+                            {item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           </span>
                           {!item.isPaid && (
                             <Button 

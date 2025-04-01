@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { format, addMonths, subMonths, isEqual, isSameMonth, isToday, parse } from 'date-fns';
+import { format, addMonths, subMonths, isSameMonth, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,7 +14,6 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Calendar as CalendarIcon, 
-  DollarSign, 
   CreditCard, 
   AlertCircle,
   Plus 
@@ -28,7 +27,7 @@ interface CalendarEvent {
   title: string;
   date: string;
   amount: number;
-  type: 'income' | 'expense' | 'invoice' | 'other';
+  type: 'expense' | 'invoice' | 'other';
   recurrence: 'once' | 'weekly' | 'monthly';
   description?: string;
 }
@@ -81,6 +80,9 @@ const CalendarPage: React.FC = () => {
       
       // Update the events for the selected date
       const dayStr = format(day, 'yyyy-MM-dd');
+      console.log("Selected date:", dayStr);
+      console.log("Events for date:", datesWithEvents[dayStr] || []);
+      
       const dayEvents = datesWithEvents[dayStr] || [];
       setCurrentDateEvents(dayEvents);
       
@@ -89,7 +91,6 @@ const CalendarPage: React.FC = () => {
         setSelectedEvent(dayEvents[0]);
         setIsViewEventDialogOpen(true);
       }
-      // We no longer automatically open the add event dialog
     }
   };
 
@@ -110,7 +111,8 @@ const CalendarPage: React.FC = () => {
       ...newEvent
     };
     
-    setEvents([...events, event]);
+    const updatedEvents = [...events, event];
+    setEvents(updatedEvents);
     setIsAddEventDialogOpen(false);
     
     // Reset form
@@ -123,7 +125,7 @@ const CalendarPage: React.FC = () => {
       description: ''
     });
     
-    // Update current date events
+    // Update current date events if we just added an event for the selected date
     if (selectedDate && format(selectedDate, 'yyyy-MM-dd') === event.date) {
       setCurrentDateEvents([...currentDateEvents, event]);
     }
@@ -177,15 +179,25 @@ const CalendarPage: React.FC = () => {
   useEffect(() => {
     if (selectedDate) {
       const dayStr = format(selectedDate, 'yyyy-MM-dd');
+      console.log("Selected date updated:", dayStr);
       const dayEvents = datesWithEvents[dayStr] || [];
+      console.log("Events for this date:", dayEvents);
       setCurrentDateEvents(dayEvents);
     }
   }, [selectedDate, datesWithEvents]);
 
+  // Ensure view is updated when events change
+  useEffect(() => {
+    if (selectedDate) {
+      const dayStr = format(selectedDate, 'yyyy-MM-dd');
+      const dayEvents = events.filter(event => event.date === dayStr);
+      setCurrentDateEvents(dayEvents);
+    }
+  }, [events, selectedDate]);
+
   // Get color for event type
   const getEventTypeColor = (type: string) => {
     switch (type) {
-      case 'income': return 'bg-green-500';
       case 'expense': return 'bg-red-500';
       case 'invoice': return 'bg-purple-500';
       default: return 'bg-gray-500';
@@ -195,7 +207,6 @@ const CalendarPage: React.FC = () => {
   // Get icon for event type
   const getEventTypeIcon = (type: string) => {
     switch (type) {
-      case 'income': return <DollarSign className="h-4 w-4" />;
       case 'expense': return <AlertCircle className="h-4 w-4" />;
       case 'invoice': return <CreditCard className="h-4 w-4" />;
       default: return <CalendarIcon className="h-4 w-4" />;
@@ -292,16 +303,11 @@ const CalendarPage: React.FC = () => {
                           <p className="text-sm mt-1 line-clamp-2">{event.description}</p>
                         )}
                       </div>
-                      <div className={`text-right font-medium ${
-                        event.type === 'income' ? 'text-green-600' : 
-                        event.type === 'expense' ? 'text-red-600' : 'text-purple-600'
-                      }`}>
-                        {(event.type === 'income' ? '+' : '') + 
-                          event.amount.toLocaleString('pt-BR', { 
-                            style: 'currency', 
-                            currency: 'BRL' 
-                          })
-                        }
+                      <div className="text-right font-medium text-red-600">
+                        {event.amount.toLocaleString('pt-BR', { 
+                          style: 'currency', 
+                          currency: 'BRL' 
+                        })}
                       </div>
                     </div>
                   ))}
@@ -382,7 +388,6 @@ const CalendarPage: React.FC = () => {
                   <SelectValue placeholder="Selecione o tipo" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="income">Receita</SelectItem>
                   <SelectItem value="expense">Despesa</SelectItem>
                   <SelectItem value="invoice">Fatura</SelectItem>
                   <SelectItem value="other">Outro</SelectItem>
@@ -485,7 +490,6 @@ const CalendarPage: React.FC = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="income">Receita</SelectItem>
                     <SelectItem value="expense">Despesa</SelectItem>
                     <SelectItem value="invoice">Fatura</SelectItem>
                     <SelectItem value="other">Outro</SelectItem>
