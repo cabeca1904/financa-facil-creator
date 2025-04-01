@@ -8,15 +8,10 @@ import {
   LineChart, 
   Settings, 
   FilePlus, 
-  Menu as MenuIcon,
   Plus,
-  Moon,
-  Sun,
-  Bell,
   Clock,
   CheckCircle,
   AlertCircle,
-  LogOut
 } from 'lucide-react';
 import { useLocalStorage } from '../hooks/use-local-storage';
 import { 
@@ -27,15 +22,6 @@ import {
   CardHeader, 
   CardTitle 
 } from "@/components/ui/card";
-import { 
-  NavigationMenu, 
-  NavigationMenuContent, 
-  NavigationMenuItem, 
-  NavigationMenuLink, 
-  NavigationMenuList, 
-  NavigationMenuTrigger,
-  navigationMenuTriggerStyle 
-} from "@/components/ui/navigation-menu";
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import { Separator } from '@/components/ui/separator';
@@ -59,15 +45,6 @@ import {
   Tooltip, 
   Legend 
 } from 'recharts';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 // Types for our application
 type TransactionType = 'income' | 'expense';
@@ -215,64 +192,13 @@ const initialCalendarEvents: CalendarEvent[] = [
   },
 ];
 
-// Sample pending items
-const initialPendingItems: PendingItem[] = [
-  {
-    id: '1',
-    title: 'Aluguel',
-    amount: 1200,
-    dueDate: '2023-12-10',
-    type: 'bill',
-    isPaid: false,
-    isOverdue: false
-  },
-  {
-    id: '2',
-    title: 'Energia Elétrica',
-    amount: 180,
-    dueDate: '2023-12-15',
-    type: 'bill',
-    isPaid: false,
-    isOverdue: false
-  },
-  {
-    id: '3',
-    title: 'Fatura do Cartão',
-    amount: 1500,
-    dueDate: '2023-12-20',
-    type: 'bill',
-    isPaid: false,
-    isOverdue: false
-  },
-  {
-    id: '4',
-    title: 'Salário',
-    amount: 5000,
-    dueDate: '2023-12-05',
-    type: 'income',
-    isPaid: true,
-    isOverdue: false
-  },
-  {
-    id: '5',
-    title: 'Conta de Água',
-    amount: 90,
-    dueDate: '2023-11-28',
-    type: 'bill',
-    isPaid: false,
-    isOverdue: true
-  }
-];
-
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
   // State management with localStorage persistence
-  const [darkMode, setDarkMode] = useLocalStorage('darkMode', false);
   const [accounts, setAccounts] = useLocalStorage('accounts', initialAccounts);
   const [categories, setCategories] = useLocalStorage('categories', initialCategories);
   const [transactions, setTransactions] = useLocalStorage('transactions', initialTransactions);
   const [calendarEvents, setCalendarEvents] = useLocalStorage('calendarEvents', initialCalendarEvents);
   const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   const navigate = useNavigate();
 
@@ -370,16 +296,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
     showNotification("Item marcado como pago");
   };
 
-  // Toggle dark mode
-  const toggleDarkMode = () => {
-    document.documentElement.classList.toggle('dark');
-    setDarkMode(!darkMode);
-  };
-
   // Handle navigation
   const navigateTo = (path: string) => {
     navigate(path);
-    setMobileMenuOpen(false);
   };
 
   // Show a notification
@@ -392,162 +311,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Top navigation */}
-      <header className="border-b p-4 bg-card">
-        <div className="container mx-auto flex flex-col items-center justify-between md:flex-row">
-          <div className="flex items-center gap-2">
-            <DollarSign className="h-6 w-6 text-comeco-purple" />
-            <h1 className="text-xl font-bold">FinançaFácil</h1>
-          </div>
-
-          {/* Desktop Navigation - Centered on all pages */}
-          <nav className="hidden md:block">
-            <NavigationMenu>
-              <NavigationMenuList>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className={navigationMenuTriggerStyle()}
-                    onClick={() => navigateTo('/')}
-                  >
-                    Visão Geral
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className={navigationMenuTriggerStyle()}
-                    onClick={() => navigateTo('/accounts-categories')}
-                  >
-                    Contas e Categorias
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className={navigationMenuTriggerStyle()}
-                    onClick={() => navigateTo('/calendar')}
-                  >
-                    Calendário
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className={navigationMenuTriggerStyle()}
-                    onClick={() => navigateTo('/reports')}
-                  >
-                    Relatórios
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className={navigationMenuTriggerStyle()}
-                    onClick={() => navigateTo('/settings')}
-                  >
-                    Configurações
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-              </NavigationMenuList>
-            </NavigationMenu>
-          </nav>
-
-          {/* User account dropdown */}
-          <div className="hidden md:flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 rounded-full p-1 hover:bg-accent transition-colors focus:outline-none">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src="" alt={user.username} />
-                    <AvatarFallback className="bg-primary text-white">
-                      {user.username.substring(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="hidden md:inline-block">{user.username}</span>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigateTo('/settings')}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Configurações</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onLogout} className="text-destructive focus:text-destructive">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sair</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {/* Mobile menu button */}
-          <button 
-            className="md:hidden flex items-center" 
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            <MenuIcon className="h-6 w-6" />
-          </button>
-        </div>
-
-        {/* Mobile Navigation */}
-        {mobileMenuOpen && (
-          <div className="md:hidden mt-4 border-t pt-4">
-            <div className="flex flex-col gap-4">
-              <button 
-                className="text-left px-4 py-2 hover:bg-accent rounded-md"
-                onClick={() => navigateTo('/')}
-              >
-                Visão Geral
-              </button>
-              <button 
-                className="text-left px-4 py-2 hover:bg-accent rounded-md"
-                onClick={() => navigateTo('/accounts-categories')}
-              >
-                Contas e Categorias
-              </button>
-              <button 
-                className="text-left px-4 py-2 hover:bg-accent rounded-md"
-                onClick={() => navigateTo('/calendar')}
-              >
-                Calendário
-              </button>
-              <button 
-                className="text-left px-4 py-2 hover:bg-accent rounded-md"
-                onClick={() => navigateTo('/reports')}
-              >
-                Relatórios
-              </button>
-              <button 
-                className="text-left px-4 py-2 hover:bg-accent rounded-md"
-                onClick={() => navigateTo('/settings')}
-              >
-                Configurações
-              </button>
-              
-              <Separator />
-              
-              <div className="px-4 py-2">
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary text-white">
-                      {user.username.substring(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span>{user.username}</span>
-                </div>
-              </div>
-              
-              <button 
-                className="text-left px-4 py-2 hover:bg-accent rounded-md text-destructive"
-                onClick={onLogout}
-              >
-                <div className="flex items-center gap-2">
-                  <LogOut className="h-4 w-4" />
-                  <span>Sair</span>
-                </div>
-              </button>
-            </div>
-          </div>
-        )}
-      </header>
-
       {/* Main content */}
       <main className="container mx-auto py-6 px-4">
         <h2 className="text-2xl font-bold mb-6">Visão Geral</h2>
@@ -659,7 +422,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
                             ) : item.type === 'income' ? (
                               <DollarSign className={`h-4 w-4 ${item.isPaid ? 'text-green-500' : 'text-blue-500'}`} />
                             ) : (
-                              <Bell className={`h-4 w-4 ${item.isPaid ? 'text-green-500' : 'text-purple-500'}`} />
+                              <AlertCircle className={`h-4 w-4 ${item.isPaid ? 'text-green-500' : 'text-purple-500'}`} />
                             )}
                             <h4 className="font-medium">{item.title}</h4>
                           </div>
@@ -704,7 +467,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
                   ))
                 ) : (
                   <div className="text-center py-10 text-muted-foreground">
-                    <Bell className="mx-auto h-12 w-12 opacity-20 mb-2" />
+                    <AlertCircle className="mx-auto h-12 w-12 opacity-20 mb-2" />
                     <p>Nenhuma pendência no momento</p>
                   </div>
                 )}
@@ -738,27 +501,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
           </Button>
         </div>
       </main>
-
-      {/* Footer with theme toggle */}
-      <footer className="border-t p-4 mt-auto bg-card">
-        <div className="container mx-auto flex justify-between items-center">
-          <div>
-            <p className="text-sm">© 2023 FinançaFácil</p>
-          </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={toggleDarkMode}
-            className="fixed bottom-4 left-4 z-50 bg-card border shadow-md"
-          >
-            {darkMode ? (
-              <Sun className="h-5 w-5" />
-            ) : (
-              <Moon className="h-5 w-5" />
-            )}
-          </Button>
-        </div>
-      </footer>
     </div>
   );
 };

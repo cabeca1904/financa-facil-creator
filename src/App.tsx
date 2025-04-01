@@ -4,9 +4,10 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useLocalStorage } from "./hooks/use-local-storage";
 import LoginForm from "./components/LoginForm";
+import NavBar from "./components/NavBar";
 import Index from "./pages/Index";
 import AccountsCategories from "./pages/AccountsCategories";
 import Calendar from "./pages/Calendar";
@@ -49,14 +50,17 @@ const App = () => {
           {!user.isLoggedIn ? (
             <LoginForm onLogin={handleLogin} />
           ) : (
-            <Routes>
-              <Route path="/" element={<Index onLogout={handleLogout} user={user} />} />
-              <Route path="/accounts-categories" element={<AccountsCategories />} />
-              <Route path="/calendar" element={<Calendar />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/settings" element={<Settings onLogout={handleLogout} />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <>
+              <NavBar onLogout={handleLogout} user={user} />
+              <Routes>
+                <Route path="/" element={<Index onLogout={handleLogout} user={user} />} />
+                <Route path="/accounts-categories" element={<AccountsCategories />} />
+                <Route path="/calendar" element={<Calendar />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/settings" element={<Settings onLogout={handleLogout} />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </>
           )}
         </BrowserRouter>
       </TooltipProvider>
