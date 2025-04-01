@@ -284,12 +284,22 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
       const eventDate = new Date(event.date);
       const isOverdue = eventDate < today && !isPastEvent(event);
       
+      // Map event type to PendingItem type
+      let pendingItemType: 'bill' | 'income' | 'goal';
+      if (event.type === 'income') {
+        pendingItemType = 'income';
+      } else if (event.type === 'invoice' || event.type === 'expense') {
+        pendingItemType = 'bill';
+      } else {
+        pendingItemType = 'goal'; // Default for 'other' type
+      }
+      
       return {
         id: event.id,
         title: event.title,
         amount: event.amount,
         dueDate: event.date,
-        type: event.type === 'income' ? 'income' : event.type === 'invoice' ? 'bill' : 'bill',
+        type: pendingItemType,
         isPaid: isPastEvent(event),
         isOverdue: isOverdue
       };
