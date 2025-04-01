@@ -1,81 +1,17 @@
 
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  Plus, 
-  Trash, 
-  Edit, 
-  Save, 
-  ArrowLeft, 
-  Circle,
-  Home as HomeIcon,
-  CreditCard,
-  Wallet,
-  DollarSign,
-  Menu as MenuIcon,
-  Moon,
-  Sun,
-  X
-} from 'lucide-react';
-import { useLocalStorage } from '../hooks/use-local-storage';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger, 
-  DialogClose
-} from "@/components/ui/dialog";
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from "@/components/ui/tabs";
-import { 
-  NavigationMenu, 
-  NavigationMenuContent, 
-  NavigationMenuItem, 
-  NavigationMenuLink, 
-  NavigationMenuList, 
-  NavigationMenuTrigger,
-  navigationMenuTriggerStyle 
-} from "@/components/ui/navigation-menu";
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { toast } from '@/components/ui/use-toast';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import React, { useState, useEffect } from 'react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "@/components/ui/use-toast";
+import { useLocalStorage } from "../hooks/use-local-storage";
+import { Edit2, Trash2, Plus, DollarSign, CreditCard, Wallet, Building, Tag } from "lucide-react";
 
-// Types
+// Types for accounts and categories
 type TransactionType = 'income' | 'expense';
 type AccountType = 'bank' | 'cash' | 'credit';
 
@@ -85,7 +21,6 @@ interface Account {
   balance: number;
   type: AccountType;
   color: string;
-  description?: string;
 }
 
 interface Category {
@@ -96,899 +31,725 @@ interface Category {
   budget?: number;
 }
 
-// Initial data from localStorage or defaults
-const initialAccounts: Account[] = [
-  { id: '1', name: 'Conta Principal', balance: 5000, type: 'bank', color: '#3B82F6' },
-  { id: '2', name: 'Dinheiro', balance: 500, type: 'cash', color: '#10B981' },
-  { id: '3', name: 'Cartão de Crédito', balance: -1500, type: 'credit', color: '#EF4444' },
-];
+interface Transaction {
+  id: string;
+  description: string;
+  amount: number;
+  date: string;
+  category: string;
+  type: TransactionType;
+  accountId: string;
+}
 
-const initialCategories: Category[] = [
-  { id: '1', name: 'Salário', color: '#10B981', type: 'income', budget: 5000 },
-  { id: '2', name: 'Alimentação', color: '#F59E0B', type: 'expense', budget: 1000 },
-  { id: '3', name: 'Transporte', color: '#3B82F6', type: 'expense', budget: 500 },
-  { id: '4', name: 'Moradia', color: '#8B5CF6', type: 'expense', budget: 1500 },
-  { id: '5', name: 'Lazer', color: '#EC4899', type: 'expense', budget: 300 },
-  { id: '6', name: 'Saúde', color: '#EF4444', type: 'expense', budget: 400 },
-];
-
-// Color options for categories and accounts
-const colorOptions = [
-  { name: 'Azul', value: '#3B82F6' },
-  { name: 'Verde', value: '#10B981' },
-  { name: 'Vermelho', value: '#EF4444' },
-  { name: 'Amarelo', value: '#F59E0B' },
-  { name: 'Roxo', value: '#8B5CF6' },
-  { name: 'Rosa', value: '#EC4899' },
-  { name: 'Cinza', value: '#6B7280' },
-  { name: 'Turquesa', value: '#06B6D4' },
-];
-
-const AccountsCategories = () => {
-  const navigate = useNavigate();
+const AccountsCategories: React.FC = () => {
+  // State for accounts and categories
+  const [accounts, setAccounts] = useLocalStorage<Account[]>('accounts', []);
+  const [categories, setCategories] = useLocalStorage<Category[]>('categories', []);
+  const [transactions, setTransactions] = useLocalStorage<Transaction[]>('transactions', []);
   
-  // State management
-  const [darkMode, setDarkMode] = useLocalStorage('darkMode', false);
-  const [accounts, setAccounts] = useLocalStorage('accounts', initialAccounts);
-  const [categories, setCategories] = useLocalStorage('categories', initialCategories);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  
-  // Edit states
-  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  
-  // New account state
+  // State for new account
   const [newAccount, setNewAccount] = useState<Omit<Account, 'id'>>({
     name: '',
     balance: 0,
     type: 'bank',
-    color: '#3B82F6',
+    color: '#3B82F6'
   });
   
-  // New category state
+  // State for new category
   const [newCategory, setNewCategory] = useState<Omit<Category, 'id'>>({
     name: '',
-    color: '#3B82F6',
+    color: '#10B981',
     type: 'expense',
-    budget: 0,
+    budget: 0
   });
+  
+  // State for editing
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [isAccountDialogOpen, setIsAccountDialogOpen] = useState(false);
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+  const [isDeleteAccountDialogOpen, setIsDeleteAccountDialogOpen] = useState(false);
+  const [isDeleteCategoryDialogOpen, setIsDeleteCategoryDialogOpen] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
+  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
 
-  // Dialog states
-  const [accountDialogOpen, setAccountDialogOpen] = useState(false);
-  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
-
-  // Toggle dark mode
-  const toggleDarkMode = () => {
-    document.documentElement.classList.toggle('dark');
-    setDarkMode(!darkMode);
-  };
-
-  // Handle navigation
-  const navigateTo = (path: string) => {
-    navigate(path);
-    setMobileMenuOpen(false);
-  };
-
-  // Show a notification
-  const showNotification = (message: string) => {
-    toast({
-      title: "FinançaFácil",
-      description: message,
-    });
-  };
-
-  // Handle account form changes
-  const handleAccountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    
-    if (editingAccount) {
-      setEditingAccount({
-        ...editingAccount,
-        [name]: name === 'balance' ? parseFloat(value) || 0 : value,
-      });
-    } else {
-      setNewAccount({
-        ...newAccount,
-        [name]: name === 'balance' ? parseFloat(value) || 0 : value,
-      });
+  // Get account icon based on type
+  const getAccountIcon = (type: AccountType) => {
+    switch (type) {
+      case 'bank':
+        return <Building className="h-6 w-6" />;
+      case 'cash':
+        return <Wallet className="h-6 w-6" />;
+      case 'credit':
+        return <CreditCard className="h-6 w-6" />;
+      default:
+        return <DollarSign className="h-6 w-6" />;
     }
   };
 
-  // Handle category form changes
-  const handleCategoryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+  // Handle account creation
+  const handleCreateAccount = () => {
+    const id = `account-${Date.now()}`;
+    const account: Account = {
+      id,
+      ...newAccount
+    };
     
-    if (editingCategory) {
-      setEditingCategory({
-        ...editingCategory,
-        [name]: name === 'budget' ? parseFloat(value) || 0 : value,
-      });
-    } else {
-      setNewCategory({
-        ...newCategory,
-        [name]: name === 'budget' ? parseFloat(value) || 0 : value,
-      });
-    }
-  };
-
-  // Add new account
-  const addAccount = () => {
-    if (!newAccount.name) {
-      showNotification("Por favor, insira um nome para a conta");
-      return;
-    }
-
-    const newId = (Math.max(...accounts.map(a => parseInt(a.id)), 0) + 1).toString();
-    const accountToAdd = { ...newAccount, id: newId };
+    setAccounts([...accounts, account]);
+    setIsAccountDialogOpen(false);
     
-    setAccounts([...accounts, accountToAdd]);
+    // Reset form
     setNewAccount({
       name: '',
       balance: 0,
       type: 'bank',
-      color: '#3B82F6',
+      color: '#3B82F6'
     });
     
-    setAccountDialogOpen(false);
-    showNotification("Conta adicionada com sucesso");
+    toast({
+      title: "Conta criada",
+      description: "A conta foi adicionada com sucesso."
+    });
   };
 
-  // Add new category
-  const addCategory = () => {
-    if (!newCategory.name) {
-      showNotification("Por favor, insira um nome para a categoria");
-      return;
+  // Handle account update
+  const handleUpdateAccount = () => {
+    if (editingAccount) {
+      setAccounts(accounts.map(account => 
+        account.id === editingAccount.id ? editingAccount : account
+      ));
+      setIsAccountDialogOpen(false);
+      
+      toast({
+        title: "Conta atualizada",
+        description: "As alterações foram salvas."
+      });
     }
+  };
 
-    const newId = (Math.max(...categories.map(c => parseInt(c.id)), 0) + 1).toString();
-    const categoryToAdd = { ...newCategory, id: newId };
+  // Handle account deletion
+  const handleDeleteAccount = () => {
+    if (accountToDelete) {
+      // Check if account is used in transactions
+      const isUsed = transactions.some(transaction => transaction.accountId === accountToDelete.id);
+      
+      if (isUsed) {
+        toast({
+          title: "Não é possível excluir",
+          description: "Esta conta está sendo usada em transações.",
+          variant: "destructive"
+        });
+      } else {
+        setAccounts(accounts.filter(account => account.id !== accountToDelete.id));
+        setIsDeleteAccountDialogOpen(false);
+        
+        toast({
+          title: "Conta excluída",
+          description: "A conta foi removida com sucesso."
+        });
+      }
+    }
+  };
+
+  // Handle category creation
+  const handleCreateCategory = () => {
+    const id = `category-${Date.now()}`;
+    const category: Category = {
+      id,
+      ...newCategory
+    };
     
-    setCategories([...categories, categoryToAdd]);
+    setCategories([...categories, category]);
+    setIsCategoryDialogOpen(false);
+    
+    // Reset form
     setNewCategory({
       name: '',
-      color: '#3B82F6',
+      color: '#10B981',
       type: 'expense',
-      budget: 0,
+      budget: 0
     });
     
-    setCategoryDialogOpen(false);
-    showNotification("Categoria adicionada com sucesso");
+    toast({
+      title: "Categoria criada",
+      description: "A categoria foi adicionada com sucesso."
+    });
   };
 
-  // Delete account
-  const deleteAccount = (id: string) => {
-    setAccounts(accounts.filter(account => account.id !== id));
-    showNotification("Conta removida com sucesso");
-  };
-
-  // Delete category
-  const deleteCategory = (id: string) => {
-    setCategories(categories.filter(category => category.id !== id));
-    showNotification("Categoria removida com sucesso");
-  };
-
-  // Save edited account
-  const saveAccount = () => {
-    if (!editingAccount) return;
-    
-    setAccounts(accounts.map(account => 
-      account.id === editingAccount.id ? editingAccount : account
-    ));
-    
-    setEditingAccount(null);
-    showNotification("Conta atualizada com sucesso");
-  };
-
-  // Save edited category
-  const saveCategory = () => {
-    if (!editingCategory) return;
-    
-    setCategories(categories.map(category => 
-      category.id === editingCategory.id ? editingCategory : category
-    ));
-    
-    setEditingCategory(null);
-    showNotification("Categoria atualizada com sucesso");
-  };
-
-  // Get icon for account type
-  const getAccountIcon = (type: AccountType) => {
-    switch (type) {
-      case 'bank':
-        return <HomeIcon size={18} />;
-      case 'cash':
-        return <Wallet size={18} />;
-      case 'credit':
-        return <CreditCard size={18} />;
-      default:
-        return <DollarSign size={18} />;
+  // Handle category update
+  const handleUpdateCategory = () => {
+    if (editingCategory) {
+      setCategories(categories.map(category => 
+        category.id === editingCategory.id ? editingCategory : category
+      ));
+      setIsCategoryDialogOpen(false);
+      
+      // Update transactions with this category to match the new expense/income type
+      if (transactions.some(t => t.category === editingCategory.id && t.type !== editingCategory.type)) {
+        const updatedTransactions = transactions.map(transaction => 
+          transaction.category === editingCategory.id ? 
+            { ...transaction, type: editingCategory.type } : 
+            transaction
+        );
+        setTransactions(updatedTransactions);
+      }
+      
+      toast({
+        title: "Categoria atualizada",
+        description: "As alterações foram salvas."
+      });
     }
   };
 
+  // Handle category deletion
+  const handleDeleteCategory = () => {
+    if (categoryToDelete) {
+      // Check if category is used in transactions
+      const isUsed = transactions.some(transaction => transaction.category === categoryToDelete.id);
+      
+      if (isUsed) {
+        toast({
+          title: "Não é possível excluir",
+          description: "Esta categoria está sendo usada em transações.",
+          variant: "destructive"
+        });
+      } else {
+        setCategories(categories.filter(category => category.id !== categoryToDelete.id));
+        setIsDeleteCategoryDialogOpen(false);
+        
+        toast({
+          title: "Categoria excluída",
+          description: "A categoria foi removida com sucesso."
+        });
+      }
+    }
+  };
+
+  // Calculate total balance
+  const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Top navigation */}
-      <header className="border-b p-4 bg-card">
-        <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <DollarSign className="h-6 w-6 text-comeco-purple" />
-            <h1 className="text-xl font-bold">FinançaFácil</h1>
-          </div>
-
-          {/* Desktop Navigation */}
-          <nav className="hidden md:block">
-            <NavigationMenu>
-              <NavigationMenuList>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className={navigationMenuTriggerStyle()}
-                    onClick={() => navigateTo('/')}
-                  >
-                    Visão Geral
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className={navigationMenuTriggerStyle()}
-                    onClick={() => navigateTo('/accounts-categories')}
-                  >
-                    Contas e Categorias
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className={navigationMenuTriggerStyle()}
-                    onClick={() => navigateTo('/calendar')}
-                  >
-                    Calendário
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className={navigationMenuTriggerStyle()}
-                    onClick={() => navigateTo('/reports')}
-                  >
-                    Relatórios
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className={navigationMenuTriggerStyle()}
-                    onClick={() => navigateTo('/settings')}
-                  >
-                    Configurações
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-              </NavigationMenuList>
-            </NavigationMenu>
-          </nav>
-
-          {/* Mobile menu button */}
-          <button 
-            className="md:hidden flex items-center" 
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            <MenuIcon className="h-6 w-6" />
-          </button>
-        </div>
-
-        {/* Mobile Navigation */}
-        {mobileMenuOpen && (
-          <div className="md:hidden mt-4 border-t pt-4">
-            <div className="flex flex-col gap-4">
-              <button 
-                className="text-left px-4 py-2 hover:bg-accent rounded-md"
-                onClick={() => navigateTo('/')}
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-6">Contas e Categorias</h1>
+      
+      <Tabs defaultValue="accounts" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsTrigger value="accounts">Contas</TabsTrigger>
+          <TabsTrigger value="categories">Categorias</TabsTrigger>
+        </TabsList>
+        
+        {/* Accounts Tab */}
+        <TabsContent value="accounts">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Suas Contas</h2>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => {
+                  setEditingAccount(null);
+                  setIsAccountDialogOpen(true);
+                }}
+                className="flex items-center gap-2"
               >
-                Visão Geral
-              </button>
-              <button 
-                className="text-left px-4 py-2 hover:bg-accent rounded-md"
-                onClick={() => navigateTo('/accounts-categories')}
-              >
-                Contas e Categorias
-              </button>
-              <button 
-                className="text-left px-4 py-2 hover:bg-accent rounded-md"
-                onClick={() => navigateTo('/calendar')}
-              >
-                Calendário
-              </button>
-              <button 
-                className="text-left px-4 py-2 hover:bg-accent rounded-md"
-                onClick={() => navigateTo('/reports')}
-              >
-                Relatórios
-              </button>
-              <button 
-                className="text-left px-4 py-2 hover:bg-accent rounded-md"
-                onClick={() => navigateTo('/settings')}
-              >
-                Configurações
-              </button>
+                <Plus className="h-4 w-4" />
+                Nova Conta
+              </Button>
             </div>
           </div>
-        )}
-      </header>
-
-      {/* Main content */}
-      <main className="container mx-auto py-6 px-4">
-        <div className="flex items-center gap-2 mb-6">
-          <Button variant="outline" size="icon" onClick={() => navigateTo('/')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h2 className="text-2xl font-bold">Contas e Categorias</h2>
-        </div>
-
-        <Tabs defaultValue="accounts" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="accounts">Contas</TabsTrigger>
-            <TabsTrigger value="categories">Categorias</TabsTrigger>
-          </TabsList>
-
-          {/* Accounts Tab */}
-          <TabsContent value="accounts">
-            <div className="space-y-6">
-              {/* Quick Add Button */}
-              <div className="flex justify-center md:justify-end">
+          
+          <div className="mb-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Saldo Total</CardTitle>
+                <CardDescription>Soma de todas as suas contas</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className={`text-2xl font-bold ${totalBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {totalBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {accounts.map((account) => (
+              <Card key={account.id} className="overflow-hidden">
+                <div className="h-2" style={{ backgroundColor: account.color }} />
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between">
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="p-2 rounded-md"
+                        style={{ backgroundColor: `${account.color}20` }}
+                      >
+                        {getAccountIcon(account.type)}
+                      </div>
+                      <CardTitle className="text-lg">{account.name}</CardTitle>
+                    </div>
+                  </div>
+                  <CardDescription>
+                    {account.type === 'bank' ? 'Conta Bancária' : 
+                     account.type === 'cash' ? 'Dinheiro em Espécie' : 'Cartão de Crédito'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className={`text-xl font-semibold ${account.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {account.balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </p>
+                </CardContent>
+                <CardFooter className="flex justify-end gap-2 pt-0">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setEditingAccount(account);
+                      setIsAccountDialogOpen(true);
+                    }}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => {
+                      setAccountToDelete(account);
+                      setIsDeleteAccountDialogOpen(true);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
+            
+            {accounts.length === 0 && (
+              <Card className="col-span-full p-8 flex flex-col items-center justify-center">
+                <DollarSign className="h-12 w-12 text-muted-foreground mb-4" />
+                <p className="text-center text-muted-foreground mb-4">
+                  Você ainda não possui contas cadastradas.
+                </p>
                 <Button 
-                  className="w-full md:w-auto"
-                  onClick={() => setAccountDialogOpen(true)}
+                  onClick={() => {
+                    setEditingAccount(null);
+                    setIsAccountDialogOpen(true);
+                  }}
                 >
-                  <Plus className="mr-2 h-4 w-4" /> Adicionar Nova Conta
+                  Adicionar Conta
                 </Button>
-              </div>
-
-              {/* Accounts List */}
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {accounts.length === 0 ? (
-                  <Card className="col-span-full">
-                    <CardContent className="pt-6 text-center">
-                      <p className="text-muted-foreground">
-                        Nenhuma conta adicionada ainda. Clique em "Adicionar Nova Conta" para começar.
-                      </p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  accounts.map(account => (
-                    <Card 
-                      key={account.id} 
-                      className="group hover:shadow-md transition-all duration-200"
-                    >
-                      <CardHeader className="pb-2 relative">
-                        <div className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  onClick={() => setEditingAccount(account)}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                Editar conta
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                        <div className="flex items-center gap-3">
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+        
+        {/* Categories Tab */}
+        <TabsContent value="categories">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Suas Categorias</h2>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => {
+                  setEditingCategory(null);
+                  setIsCategoryDialogOpen(true);
+                }}
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Nova Categoria
+              </Button>
+            </div>
+          </div>
+          
+          <Tabs defaultValue="expense" className="w-full mb-6">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="expense">Despesas</TabsTrigger>
+              <TabsTrigger value="income">Receitas</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="expense">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                {categories.filter(cat => cat.type === 'expense').map((category) => (
+                  <Card key={category.id} className="overflow-hidden">
+                    <div className="h-2" style={{ backgroundColor: category.color }} />
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between">
+                        <div className="flex items-center gap-2">
                           <div 
-                            className="w-10 h-10 rounded-full flex items-center justify-center text-white"
-                            style={{ backgroundColor: account.color }}
+                            className="p-2 rounded-full"
+                            style={{ backgroundColor: category.color }}
                           >
-                            {getAccountIcon(account.type)}
+                            <Tag className="h-4 w-4 text-white" />
                           </div>
-                          <div>
-                            <CardTitle className="text-base">{account.name}</CardTitle>
-                            <CardDescription>
-                              {account.type === 'bank' ? 'Conta Bancária' : 
-                               account.type === 'cash' ? 'Dinheiro em Espécie' : 
-                               'Cartão de Crédito'}
-                            </CardDescription>
-                          </div>
+                          <CardTitle className="text-lg">{category.name}</CardTitle>
                         </div>
-                      </CardHeader>
-                      <CardContent>
-                        <p className={`text-xl font-bold ${account.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {account.balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </p>
-                        {account.description && (
-                          <p className="text-sm text-muted-foreground mt-1">{account.description}</p>
-                        )}
-                      </CardContent>
-                      <CardFooter className="pt-0">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-primary hover:text-primary/90"
-                          onClick={() => setEditingAccount(account)}
-                        >
-                          Gerenciar Conta
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  ))
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {category.budget ? (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-1">Orçamento</p>
+                          <p className="text-lg font-semibold">
+                            {(category.budget || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Nenhum orçamento definido</p>
+                      )}
+                    </CardContent>
+                    <CardFooter className="flex justify-end gap-2 pt-0">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setEditingCategory(category);
+                          setIsCategoryDialogOpen(true);
+                        }}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          setCategoryToDelete(category);
+                          setIsDeleteCategoryDialogOpen(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+                
+                {categories.filter(cat => cat.type === 'expense').length === 0 && (
+                  <Card className="col-span-full p-8 flex flex-col items-center justify-center">
+                    <Tag className="h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="text-center text-muted-foreground mb-4">
+                      Você ainda não possui categorias de despesa cadastradas.
+                    </p>
+                    <Button 
+                      onClick={() => {
+                        setEditingCategory(null);
+                        setNewCategory({...newCategory, type: 'expense'});
+                        setIsCategoryDialogOpen(true);
+                      }}
+                    >
+                      Adicionar Categoria
+                    </Button>
+                  </Card>
                 )}
               </div>
-            </div>
-
-            {/* Add Account Dialog */}
-            <Dialog open={accountDialogOpen} onOpenChange={setAccountDialogOpen}>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Adicionar Nova Conta</DialogTitle>
-                  <DialogDescription>
-                    Crie uma nova conta bancária, carteira ou cartão de crédito
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Nome da Conta</Label>
-                    <Input 
-                      id="name" 
-                      name="name"
-                      placeholder="Ex: Nubank, Carteira, etc." 
-                      value={newAccount.name}
-                      onChange={handleAccountChange}
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="balance">Saldo Inicial</Label>
-                    <Input 
-                      id="balance" 
-                      name="balance"
-                      type="number" 
-                      placeholder="0.00" 
-                      value={newAccount.balance}
-                      onChange={handleAccountChange}
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="type">Tipo</Label>
-                    <Select 
-                      defaultValue={newAccount.type}
-                      onValueChange={(value) => setNewAccount({...newAccount, type: value as AccountType})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="bank">Conta Bancária</SelectItem>
-                        <SelectItem value="cash">Dinheiro em Espécie</SelectItem>
-                        <SelectItem value="credit">Cartão de Crédito</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="color">Cor</Label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {colorOptions.map(color => (
-                        <div 
-                          key={color.value}
-                          className={`w-full aspect-square rounded-md cursor-pointer border-2 ${
-                            newAccount.color === color.value ? 'border-primary' : 'border-transparent'
-                          }`}
-                          style={{ backgroundColor: color.value }}
-                          onClick={() => setNewAccount({...newAccount, color: color.value})}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="description">Descrição (opcional)</Label>
-                    <Input 
-                      id="description" 
-                      name="description"
-                      placeholder="Descrição ou notas sobre esta conta" 
-                      value={newAccount.description || ''}
-                      onChange={handleAccountChange}
-                    />
-                  </div>
-                </div>
-                <DialogFooter className="flex gap-2">
-                  <Button variant="outline" onClick={() => setAccountDialogOpen(false)}>Cancelar</Button>
-                  <Button onClick={addAccount}>Adicionar Conta</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
-            {/* Edit Account Dialog */}
-            {editingAccount && (
-              <Dialog open={!!editingAccount} onOpenChange={() => setEditingAccount(null)}>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>Editar Conta</DialogTitle>
-                    <DialogDescription>
-                      Atualize os detalhes da sua conta
-                    </DialogDescription>
-                  </DialogHeader>
-                  
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="edit-name">Nome da Conta</Label>
-                      <Input 
-                        id="edit-name" 
-                        name="name"
-                        value={editingAccount.name}
-                        onChange={handleAccountChange}
-                      />
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="edit-balance">Saldo</Label>
-                      <Input 
-                        id="edit-balance" 
-                        name="balance"
-                        type="number" 
-                        value={editingAccount.balance}
-                        onChange={handleAccountChange}
-                      />
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="edit-type">Tipo</Label>
-                      <Select 
-                        value={editingAccount.type}
-                        onValueChange={(value) => setEditingAccount({
-                          ...editingAccount, 
-                          type: value as AccountType
-                        })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="bank">Conta Bancária</SelectItem>
-                          <SelectItem value="cash">Dinheiro em Espécie</SelectItem>
-                          <SelectItem value="credit">Cartão de Crédito</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="edit-color">Cor</Label>
-                      <div className="grid grid-cols-4 gap-2">
-                        {colorOptions.map(color => (
+            </TabsContent>
+            
+            <TabsContent value="income">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                {categories.filter(cat => cat.type === 'income').map((category) => (
+                  <Card key={category.id} className="overflow-hidden">
+                    <div className="h-2" style={{ backgroundColor: category.color }} />
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between">
+                        <div className="flex items-center gap-2">
                           <div 
-                            key={color.value}
-                            className={`w-full aspect-square rounded-md cursor-pointer border-2 ${
-                              editingAccount.color === color.value ? 'border-primary' : 'border-transparent'
-                            }`}
-                            style={{ backgroundColor: color.value }}
-                            onClick={() => setEditingAccount({...editingAccount, color: color.value})}
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="edit-description">Descrição (opcional)</Label>
-                      <Input 
-                        id="edit-description" 
-                        name="description"
-                        value={editingAccount.description || ''}
-                        onChange={handleAccountChange}
-                      />
-                    </div>
-                  </div>
-                  
-                  <DialogFooter className="flex flex-col sm:flex-row gap-2">
-                    <Button
-                      variant="destructive"
-                      onClick={() => {
-                        deleteAccount(editingAccount.id);
-                        setEditingAccount(null);
-                      }}
-                    >
-                      <Trash className="mr-2 h-4 w-4" /> Excluir
-                    </Button>
-                    <Button onClick={saveAccount}>
-                      <Save className="mr-2 h-4 w-4" /> Salvar Alterações
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            )}
-          </TabsContent>
-
-          {/* Categories Tab */}
-          <TabsContent value="categories">
-            <div className="space-y-6">
-              {/* Quick Add Button */}
-              <div className="flex justify-center md:justify-end">
-                <Button 
-                  className="w-full md:w-auto"
-                  onClick={() => setCategoryDialogOpen(true)}
-                >
-                  <Plus className="mr-2 h-4 w-4" /> Adicionar Nova Categoria
-                </Button>
-              </div>
-
-              {/* Categories tabs by type */}
-              <Tabs defaultValue="expense" className="w-full">
-                <TabsList className="w-full mb-4">
-                  <TabsTrigger value="expense" className="flex-1">Despesas</TabsTrigger>
-                  <TabsTrigger value="income" className="flex-1">Receitas</TabsTrigger>
-                </TabsList>
-
-                {['expense', 'income'].map((type) => (
-                  <TabsContent key={type} value={type} className="mt-0">
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {categories
-                        .filter(category => category.type === type)
-                        .map(category => (
-                          <Card 
-                            key={category.id} 
-                            className="group hover:shadow-md transition-all duration-200"
+                            className="p-2 rounded-full"
+                            style={{ backgroundColor: category.color }}
                           >
-                            <CardHeader className="pb-2 relative">
-                              <div className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7"
-                                        onClick={() => setEditingCategory(category)}
-                                      >
-                                        <Edit className="h-4 w-4" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      Editar categoria
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <div 
-                                  className="w-8 h-8 rounded-full"
-                                  style={{ backgroundColor: category.color }}
-                                />
-                                <div>
-                                  <CardTitle className="text-base">{category.name}</CardTitle>
-                                  <CardDescription>
-                                    {category.type === 'income' ? 'Receita' : 'Despesa'}
-                                  </CardDescription>
-                                </div>
-                              </div>
-                            </CardHeader>
-                            <CardContent>
-                              {category.budget ? (
-                                <div>
-                                  <p className="text-sm text-muted-foreground">Orçamento:</p>
-                                  <p className="text-xl font-bold">
-                                    {category.budget.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                  </p>
-                                </div>
-                              ) : (
-                                <p className="text-sm text-muted-foreground">
-                                  Sem orçamento definido
-                                </p>
-                              )}
-                            </CardContent>
-                            <CardFooter className="pt-0">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="text-primary hover:text-primary/90"
-                                onClick={() => setEditingCategory(category)}
-                              >
-                                Gerenciar Categoria
-                              </Button>
-                            </CardFooter>
-                          </Card>
-                        ))}
-
-                      {categories.filter(category => category.type === type).length === 0 && (
-                        <Card className="col-span-full">
-                          <CardContent className="pt-6 text-center">
-                            <p className="text-muted-foreground">
-                              Nenhuma categoria de {type === 'expense' ? 'despesa' : 'receita'} adicionada ainda.
-                            </p>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
-                  </TabsContent>
-                ))}
-              </Tabs>
-            </div>
-
-            {/* Add Category Dialog */}
-            <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Adicionar Nova Categoria</DialogTitle>
-                  <DialogDescription>
-                    Crie uma nova categoria para suas transações
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="cat-name">Nome da Categoria</Label>
-                    <Input 
-                      id="cat-name" 
-                      name="name"
-                      placeholder="Ex: Alimentação, Transporte, etc." 
-                      value={newCategory.name}
-                      onChange={handleCategoryChange}
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="cat-type">Tipo</Label>
-                    <Select 
-                      defaultValue={newCategory.type}
-                      onValueChange={(value) => setNewCategory({
-                        ...newCategory, 
-                        type: value as TransactionType
-                      })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="income">Receita</SelectItem>
-                        <SelectItem value="expense">Despesa</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="cat-color">Cor</Label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {colorOptions.map(color => (
-                        <div 
-                          key={color.value}
-                          className={`w-full aspect-square rounded-md cursor-pointer border-2 ${
-                            newCategory.color === color.value ? 'border-primary' : 'border-transparent'
-                          }`}
-                          style={{ backgroundColor: color.value }}
-                          onClick={() => setNewCategory({...newCategory, color: color.value})}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="cat-budget">Orçamento</Label>
-                    <Input 
-                      id="cat-budget" 
-                      name="budget"
-                      type="number" 
-                      placeholder="0.00" 
-                      value={newCategory.budget || ''}
-                      onChange={handleCategoryChange}
-                    />
-                  </div>
-                </div>
-                <DialogFooter className="flex gap-2">
-                  <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>Cancelar</Button>
-                  <Button onClick={addCategory}>Adicionar Categoria</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
-            {/* Edit Category Dialog */}
-            {editingCategory && (
-              <Dialog open={!!editingCategory} onOpenChange={() => setEditingCategory(null)}>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>Editar Categoria</DialogTitle>
-                    <DialogDescription>
-                      Atualize os detalhes da sua categoria
-                    </DialogDescription>
-                  </DialogHeader>
-                  
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="edit-cat-name">Nome da Categoria</Label>
-                      <Input 
-                        id="edit-cat-name" 
-                        name="name"
-                        value={editingCategory.name}
-                        onChange={handleCategoryChange}
-                      />
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="edit-cat-type">Tipo</Label>
-                      <Select 
-                        value={editingCategory.type}
-                        onValueChange={(value) => setEditingCategory({
-                          ...editingCategory, 
-                          type: value as TransactionType
-                        })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="income">Receita</SelectItem>
-                          <SelectItem value="expense">Despesa</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="edit-cat-color">Cor</Label>
-                      <div className="grid grid-cols-4 gap-2">
-                        {colorOptions.map(color => (
-                          <div 
-                            key={color.value}
-                            className={`w-full aspect-square rounded-md cursor-pointer border-2 ${
-                              editingCategory.color === color.value ? 'border-primary' : 'border-transparent'
-                            }`}
-                            style={{ backgroundColor: color.value }}
-                            onClick={() => setEditingCategory({...editingCategory, color: color.value})}
-                          />
-                        ))}
+                            <Tag className="h-4 w-4 text-white" />
+                          </div>
+                          <CardTitle className="text-lg">{category.name}</CardTitle>
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="edit-cat-budget">Orçamento</Label>
-                      <Input 
-                        id="edit-cat-budget" 
-                        name="budget"
-                        type="number" 
-                        value={editingCategory.budget || ''}
-                        onChange={handleCategoryChange}
-                      />
-                    </div>
-                  </div>
-                  
-                  <DialogFooter className="flex flex-col sm:flex-row gap-2">
-                    <Button
-                      variant="destructive"
+                    </CardHeader>
+                    <CardContent>
+                      {category.budget ? (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-1">Valor Esperado</p>
+                          <p className="text-lg font-semibold text-green-600">
+                            {(category.budget || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Nenhum valor definido</p>
+                      )}
+                    </CardContent>
+                    <CardFooter className="flex justify-end gap-2 pt-0">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setEditingCategory(category);
+                          setIsCategoryDialogOpen(true);
+                        }}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => {
+                          setCategoryToDelete(category);
+                          setIsDeleteCategoryDialogOpen(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+                
+                {categories.filter(cat => cat.type === 'income').length === 0 && (
+                  <Card className="col-span-full p-8 flex flex-col items-center justify-center">
+                    <Tag className="h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="text-center text-muted-foreground mb-4">
+                      Você ainda não possui categorias de receita cadastradas.
+                    </p>
+                    <Button 
                       onClick={() => {
-                        deleteCategory(editingCategory.id);
                         setEditingCategory(null);
+                        setNewCategory({...newCategory, type: 'income'});
+                        setIsCategoryDialogOpen(true);
                       }}
                     >
-                      <Trash className="mr-2 h-4 w-4" /> Excluir
+                      Adicionar Categoria
                     </Button>
-                    <Button onClick={saveCategory}>
-                      <Save className="mr-2 h-4 w-4" /> Salvar Alterações
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            )}
-          </TabsContent>
-        </Tabs>
-      </main>
-
-      {/* Footer with theme toggle */}
-      <footer className="border-t p-4 mt-auto bg-card">
-        <div className="container mx-auto flex justify-between items-center">
-          <div>
-            <p className="text-sm">© 2023 FinançaFácil</p>
+                  </Card>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+      </Tabs>
+      
+      {/* Account Dialog */}
+      <Dialog open={isAccountDialogOpen} onOpenChange={setIsAccountDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{editingAccount ? 'Editar Conta' : 'Nova Conta'}</DialogTitle>
+            <DialogDescription>
+              {editingAccount ? 'Modifique os detalhes da conta.' : 'Adicione uma nova conta ao seu controle financeiro.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="account-name" className="text-right">
+                Nome
+              </Label>
+              <Input
+                id="account-name"
+                placeholder="Minha Conta"
+                className="col-span-3"
+                value={editingAccount ? editingAccount.name : newAccount.name}
+                onChange={(e) => editingAccount 
+                  ? setEditingAccount({ ...editingAccount, name: e.target.value })
+                  : setNewAccount({ ...newAccount, name: e.target.value })
+                }
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="account-balance" className="text-right">
+                Saldo
+              </Label>
+              <Input
+                id="account-balance"
+                type="number"
+                placeholder="0.00"
+                className="col-span-3"
+                value={editingAccount ? editingAccount.balance : newAccount.balance}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value) || 0;
+                  editingAccount 
+                    ? setEditingAccount({ ...editingAccount, balance: value })
+                    : setNewAccount({ ...newAccount, balance: value });
+                }}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="account-type" className="text-right">
+                Tipo
+              </Label>
+              <Select
+                value={editingAccount ? editingAccount.type : newAccount.type}
+                onValueChange={(value) => {
+                  const accountType = value as AccountType;
+                  editingAccount 
+                    ? setEditingAccount({ ...editingAccount, type: accountType })
+                    : setNewAccount({ ...newAccount, type: accountType });
+                }}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bank">Conta Bancária</SelectItem>
+                  <SelectItem value="cash">Dinheiro em Espécie</SelectItem>
+                  <SelectItem value="credit">Cartão de Crédito</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="account-color" className="text-right">
+                Cor
+              </Label>
+              <div className="col-span-3 flex gap-2 items-center">
+                <Input
+                  id="account-color"
+                  type="color"
+                  className="w-12 h-10 p-1"
+                  value={editingAccount ? editingAccount.color : newAccount.color}
+                  onChange={(e) => editingAccount 
+                    ? setEditingAccount({ ...editingAccount, color: e.target.value })
+                    : setNewAccount({ ...newAccount, color: e.target.value })
+                  }
+                />
+                <span className="text-muted-foreground text-sm">
+                  Escolha uma cor para identificar esta conta
+                </span>
+              </div>
+            </div>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={toggleDarkMode}
-            className="fixed bottom-4 left-4 z-50 bg-card border shadow-md"
-          >
-            {darkMode ? (
-              <Sun className="h-5 w-5" />
-            ) : (
-              <Moon className="h-5 w-5" />
-            )}
-          </Button>
-        </div>
-      </footer>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAccountDialogOpen(false)}>Cancelar</Button>
+            <Button 
+              onClick={editingAccount ? handleUpdateAccount : handleCreateAccount}
+              disabled={!editingAccount && (!newAccount.name || newAccount.name.trim() === '')}
+            >
+              {editingAccount ? 'Salvar' : 'Adicionar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Category Dialog */}
+      <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{editingCategory ? 'Editar Categoria' : 'Nova Categoria'}</DialogTitle>
+            <DialogDescription>
+              {editingCategory ? 'Modifique os detalhes da categoria.' : 'Adicione uma nova categoria ao seu controle financeiro.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="category-name" className="text-right">
+                Nome
+              </Label>
+              <Input
+                id="category-name"
+                placeholder="Minha Categoria"
+                className="col-span-3"
+                value={editingCategory ? editingCategory.name : newCategory.name}
+                onChange={(e) => editingCategory 
+                  ? setEditingCategory({ ...editingCategory, name: e.target.value })
+                  : setNewCategory({ ...newCategory, name: e.target.value })
+                }
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="category-type" className="text-right">
+                Tipo
+              </Label>
+              <Select
+                value={editingCategory ? editingCategory.type : newCategory.type}
+                onValueChange={(value) => {
+                  const categoryType = value as TransactionType;
+                  editingCategory 
+                    ? setEditingCategory({ ...editingCategory, type: categoryType })
+                    : setNewCategory({ ...newCategory, type: categoryType });
+                }}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="income">Receita</SelectItem>
+                  <SelectItem value="expense">Despesa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="category-budget" className="text-right">
+                {(editingCategory ? editingCategory.type : newCategory.type) === 'income' ? 'Valor Esperado' : 'Orçamento'}
+              </Label>
+              <Input
+                id="category-budget"
+                type="number"
+                placeholder="0.00"
+                className="col-span-3"
+                value={editingCategory ? (editingCategory.budget || 0) : (newCategory.budget || 0)}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value) || 0;
+                  editingCategory 
+                    ? setEditingCategory({ ...editingCategory, budget: value })
+                    : setNewCategory({ ...newCategory, budget: value });
+                }}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="category-color" className="text-right">
+                Cor
+              </Label>
+              <div className="col-span-3 flex gap-2 items-center">
+                <Input
+                  id="category-color"
+                  type="color"
+                  className="w-12 h-10 p-1"
+                  value={editingCategory ? editingCategory.color : newCategory.color}
+                  onChange={(e) => editingCategory 
+                    ? setEditingCategory({ ...editingCategory, color: e.target.value })
+                    : setNewCategory({ ...newCategory, color: e.target.value })
+                  }
+                />
+                <span className="text-muted-foreground text-sm">
+                  Escolha uma cor para identificar esta categoria
+                </span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCategoryDialogOpen(false)}>Cancelar</Button>
+            <Button 
+              onClick={editingCategory ? handleUpdateCategory : handleCreateCategory}
+              disabled={!editingCategory && (!newCategory.name || newCategory.name.trim() === '')}
+            >
+              {editingCategory ? 'Salvar' : 'Adicionar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Account Confirmation Dialog */}
+      <Dialog open={isDeleteAccountDialogOpen} onOpenChange={setIsDeleteAccountDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Confirmar Exclusão</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir a conta "{accountToDelete?.name}"?
+              Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteAccountDialogOpen(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleDeleteAccount}>Excluir</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Category Confirmation Dialog */}
+      <Dialog open={isDeleteCategoryDialogOpen} onOpenChange={setIsDeleteCategoryDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Confirmar Exclusão</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir a categoria "{categoryToDelete?.name}"?
+              Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteCategoryDialogOpen(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleDeleteCategory}>Excluir</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

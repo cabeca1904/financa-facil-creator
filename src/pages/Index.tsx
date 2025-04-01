@@ -271,10 +271,54 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
   const [categories, setCategories] = useLocalStorage('categories', initialCategories);
   const [transactions, setTransactions] = useLocalStorage('transactions', initialTransactions);
   const [calendarEvents, setCalendarEvents] = useLocalStorage('calendarEvents', initialCalendarEvents);
-  const [pendingItems, setPendingItems] = useLocalStorage('pendingItems', initialPendingItems);
+  const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   const navigate = useNavigate();
+
+  // Convert calendar events to pending items
+  React.useEffect(() => {
+    // Generate pending items from calendar events
+    const eventsAsPendingItems = calendarEvents.map(event => {
+      const today = new Date();
+      const eventDate = new Date(event.date);
+      const isOverdue = eventDate < today && !isPastEvent(event);
+      
+      return {
+        id: event.id,
+        title: event.title,
+        amount: event.amount,
+        dueDate: event.date,
+        type: event.type === 'income' ? 'income' : event.type === 'invoice' ? 'bill' : 'bill',
+        isPaid: isPastEvent(event),
+        isOverdue: isOverdue
+      };
+    });
+    
+    setPendingItems(eventsAsPendingItems);
+  }, [calendarEvents]);
+
+  // Helper function to determine if an event is in the past
+  const isPastEvent = (event: CalendarEvent) => {
+    const today = new Date();
+    const eventDate = new Date(event.date);
+    
+    // For recurring events, check if the event has occurred this month
+    if (event.recurrence === 'monthly') {
+      return eventDate.getDate() < today.getDate() && 
+             eventDate.getMonth() <= today.getMonth() && 
+             eventDate.getFullYear() <= today.getFullYear();
+    }
+    
+    // For weekly events, check if the event has occurred this week
+    if (event.recurrence === 'weekly') {
+      const daysDiff = Math.floor((today.getTime() - eventDate.getTime()) / (1000 * 60 * 60 * 24));
+      return daysDiff % 7 < today.getDay();
+    }
+    
+    // For one-time events, simply check if the date is in the past
+    return eventDate < today;
+  };
 
   // Calculate total balance, income, and expenses
   const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
@@ -340,13 +384,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
     <div className="min-h-screen bg-background text-foreground">
       {/* Top navigation */}
       <header className="border-b p-4 bg-card">
-        <div className="container mx-auto flex justify-between items-center">
+        <div className="container mx-auto flex flex-col items-center justify-between md:flex-row">
           <div className="flex items-center gap-2">
             <DollarSign className="h-6 w-6 text-comeco-purple" />
             <h1 className="text-xl font-bold">FinançaFácil</h1>
           </div>
 
-          {/* Desktop Navigation */}
+          {/* Desktop Navigation - Centered on all pages */}
           <nav className="hidden md:block">
             <NavigationMenu>
               <NavigationMenuList>
@@ -579,11 +623,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
             </CardContent>
           </Card>
 
-          {/* Pending items */}
+          {/* Pending items - Now shows calendar events */}
           <Card>
             <CardHeader>
               <CardTitle>Pendências</CardTitle>
-              <CardDescription>Contas a pagar, receber e metas</CardDescription>
+              <CardDescription>Eventos e contas do calendário</CardDescription>
             </CardHeader>
             <CardContent className="h-80 overflow-y-auto">
               <div className="space-y-4">

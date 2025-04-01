@@ -1,616 +1,396 @@
 
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  Calendar as CalendarIcon, 
-  Plus, 
-  Trash, 
-  Edit, 
-  Save, 
-  ArrowLeft, 
-  Search,
-  DollarSign,
-  X,
-  Menu as MenuIcon,
-  Moon,
-  Sun
-} from 'lucide-react';
-import { useLocalStorage } from '../hooks/use-local-storage';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
+import React, { useState, useEffect } from 'react';
+import { format, addMonths, subMonths, isEqual, isSameMonth, isToday, parse } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar } from '@/components/ui/calendar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  Calendar as CalendarIcon, 
+  DollarSign, 
+  CreditCard, 
+  AlertCircle,
+  Plus 
+} from 'lucide-react';
+import { useLocalStorage } from '@/hooks/use-local-storage';
 import { toast } from '@/components/ui/use-toast';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
-} from "@/components/ui/dialog";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { 
-  Popover, 
-  PopoverContent, 
-  PopoverTrigger 
-} from "@/components/ui/popover";
-import { 
-  NavigationMenu, 
-  NavigationMenuContent, 
-  NavigationMenuItem, 
-  NavigationMenuLink, 
-  NavigationMenuList, 
-  NavigationMenuTrigger,
-  navigationMenuTriggerStyle 
-} from "@/components/ui/navigation-menu";
 
-// Types
-type TransactionType = 'income' | 'expense';
-type EventType = TransactionType | 'invoice' | 'other';
-type RecurrenceType = 'once' | 'weekly' | 'monthly';
-
+// Types for calendar
 interface CalendarEvent {
   id: string;
   title: string;
   date: string;
   amount: number;
-  type: EventType;
-  recurrence: RecurrenceType;
+  type: 'income' | 'expense' | 'invoice' | 'other';
+  recurrence: 'once' | 'weekly' | 'monthly';
   description?: string;
 }
 
-// Initial data
-const initialCalendarEvents: CalendarEvent[] = [
-  {
-    id: '1',
-    title: 'Pagamento Aluguel',
-    date: '2023-12-10',
-    amount: 1200,
-    type: 'expense',
-    recurrence: 'monthly',
-    description: 'Pagamento mensal do aluguel'
-  },
-  {
-    id: '2',
-    title: 'Salário',
-    date: '2023-12-05',
-    amount: 5000,
-    type: 'income',
-    recurrence: 'monthly',
-    description: 'Salário mensal'
-  },
-  {
-    id: '3',
-    title: 'Fatura Cartão',
-    date: '2023-12-15',
-    amount: 1500,
-    type: 'invoice',
-    recurrence: 'monthly',
-    description: 'Fatura do cartão de crédito'
-  },
-];
+const CalendarPage: React.FC = () => {
+  const [events, setEvents] = useLocalStorage<CalendarEvent[]>('calendarEvents', []);
+  const [date, setDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [isAddEventDialogOpen, setIsAddEventDialogOpen] = useState(false);
+  const [isViewEventDialogOpen, setIsViewEventDialogOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
-const FinancialCalendar = () => {
-  const navigate = useNavigate();
-  
-  // State management
-  const [darkMode, setDarkMode] = useLocalStorage('darkMode', false);
-  const [calendarEvents, setCalendarEvents] = useLocalStorage('calendarEvents', initialCalendarEvents);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [date, setDate] = useState<Date | undefined>(new Date());
-  const [searchQuery, setSearchQuery] = useState("");
-  
-  // New event state
+  // Form state for new events
   const [newEvent, setNewEvent] = useState<Omit<CalendarEvent, 'id'>>({
     title: '',
-    date: new Date().toISOString().split('T')[0],
+    date: format(new Date(), 'yyyy-MM-dd'),
     amount: 0,
     type: 'expense',
     recurrence: 'once',
     description: ''
   });
-  
-  // Edit state
-  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
-  
-  // Dialog state
-  const [showDialog, setShowDialog] = useState(false);
-  
-  // Get events for the selected date
-  const getEventsForDate = (date: Date) => {
-    const dateString = date.toISOString().split('T')[0];
-    return calendarEvents.filter(event => {
-      const eventDate = new Date(event.date);
-      return eventDate.toISOString().split('T')[0] === dateString;
-    });
-  };
-  
-  // Get filtered events based on search query
-  const getFilteredEvents = () => {
-    if (!searchQuery.trim()) {
-      return calendarEvents;
+
+  // Calculate the dates with events for the current month
+  const datesWithEvents = events.reduce((acc, event) => {
+    const eventDate = new Date(event.date);
+    if (isSameMonth(eventDate, date)) {
+      const dateStr = format(eventDate, 'yyyy-MM-dd');
+      if (!acc[dateStr]) {
+        acc[dateStr] = [];
+      }
+      acc[dateStr].push(event);
     }
-    
-    const query = searchQuery.toLowerCase();
-    return calendarEvents.filter(event => 
-      event.title.toLowerCase().includes(query) || 
-      event.description?.toLowerCase().includes(query) ||
-      event.amount.toString().includes(query) ||
-      event.type.toLowerCase().includes(query)
-    );
-  };
-  
-  // Get color for event type
-  const getEventColor = (type: EventType) => {
-    switch (type) {
-      case 'income':
-        return 'bg-green-500';
-      case 'expense':
-        return 'bg-red-500';
-      case 'invoice':
-        return 'bg-purple-500';
-      case 'other':
-        return 'bg-gray-500';
-    }
-  };
-  
-  // Get text for event type
-  const getEventTypeText = (type: EventType) => {
-    switch (type) {
-      case 'income':
-        return 'Receita';
-      case 'expense':
-        return 'Despesa';
-      case 'invoice':
-        return 'Fatura';
-      case 'other':
-        return 'Outro';
-    }
-  };
-  
-  // Toggle dark mode
-  const toggleDarkMode = () => {
-    document.documentElement.classList.toggle('dark');
-    setDarkMode(!darkMode);
+    return acc;
+  }, {} as Record<string, CalendarEvent[]>);
+
+  // Handle month navigation
+  const handlePreviousMonth = () => {
+    setDate(subMonths(date, 1));
   };
 
-  // Handle navigation
-  const navigateTo = (path: string) => {
-    navigate(path);
-    setMobileMenuOpen(false);
+  const handleNextMonth = () => {
+    setDate(addMonths(date, 1));
   };
 
-  // Show a notification
-  const showNotification = (message: string) => {
-    toast({
-      title: "FinançaFácil",
-      description: message,
-    });
-  };
-  
-  // Handle date selection
-  const handleDateSelect = (date: Date | undefined) => {
-    if (date) {
-      setDate(date);
-      setNewEvent({
-        ...newEvent,
-        date: date.toISOString().split('T')[0]
-      });
-      setShowDialog(true);
+  // Handle day selection
+  const handleDaySelect = (day: Date | undefined) => {
+    if (day) {
+      setSelectedDate(day);
+      
+      // Check if there are events on this day
+      const dayStr = format(day, 'yyyy-MM-dd');
+      const dayEvents = datesWithEvents[dayStr];
+      
+      if (dayEvents && dayEvents.length === 1) {
+        // If only one event, show it directly
+        setSelectedEvent(dayEvents[0]);
+        setIsViewEventDialogOpen(true);
+      } else if (dayEvents && dayEvents.length > 1) {
+        // If multiple events, we could show a list, but for now just show the first one
+        setSelectedEvent(dayEvents[0]);
+        setIsViewEventDialogOpen(true);
+      } else {
+        // If no events, show the add event dialog
+        setNewEvent({
+          ...newEvent,
+          date: format(day, 'yyyy-MM-dd')
+        });
+        setIsAddEventDialogOpen(true);
+      }
     }
   };
-  
-  // Add new event
-  const addEvent = () => {
-    if (!newEvent.title) {
-      showNotification("Por favor, insira um título para o evento");
-      return;
-    }
+
+  // Handle event creation
+  const handleCreateEvent = () => {
+    const id = `event-${Date.now()}`;
+    const event: CalendarEvent = {
+      id,
+      ...newEvent
+    };
     
-    const newId = (Math.max(...calendarEvents.map(e => parseInt(e.id)), 0) + 1).toString();
-    const eventToAdd = { ...newEvent, id: newId };
+    setEvents([...events, event]);
+    setIsAddEventDialogOpen(false);
     
-    setCalendarEvents([...calendarEvents, eventToAdd]);
+    // Reset form
     setNewEvent({
       title: '',
-      date: new Date().toISOString().split('T')[0],
+      date: format(new Date(), 'yyyy-MM-dd'),
       amount: 0,
       type: 'expense',
       recurrence: 'once',
       description: ''
     });
     
-    setShowDialog(false);
-    showNotification("Evento adicionado com sucesso");
+    toast({
+      title: "Evento criado",
+      description: "O evento foi adicionado ao calendário e às pendências."
+    });
   };
-  
-  // Update event
-  const updateEvent = () => {
-    if (!editingEvent) return;
+
+  // Handle event deletion
+  const handleDeleteEvent = (id: string) => {
+    setEvents(events.filter(event => event.id !== id));
+    setIsViewEventDialogOpen(false);
     
-    setCalendarEvents(calendarEvents.map(event => 
-      event.id === editingEvent.id ? editingEvent : event
-    ));
-    
-    setEditingEvent(null);
-    showNotification("Evento atualizado com sucesso");
+    toast({
+      title: "Evento excluído",
+      description: "O evento foi removido do calendário."
+    });
   };
-  
-  // Delete event
-  const deleteEvent = (id: string) => {
-    setCalendarEvents(calendarEvents.filter(event => event.id !== id));
-    setEditingEvent(null);
-    showNotification("Evento removido com sucesso");
-  };
-  
-  // Handle event form changes
-  const handleEventChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    
-    if (editingEvent) {
-      setEditingEvent({
-        ...editingEvent,
-        [name]: name === 'amount' ? parseFloat(value) || 0 : value,
-      });
-    } else {
-      setNewEvent({
-        ...newEvent,
-        [name]: name === 'amount' ? parseFloat(value) || 0 : value,
+
+  // Handle event update
+  const handleUpdateEvent = () => {
+    if (selectedEvent) {
+      setEvents(events.map(event => 
+        event.id === selectedEvent.id ? selectedEvent : event
+      ));
+      setIsViewEventDialogOpen(false);
+      
+      toast({
+        title: "Evento atualizado",
+        description: "As alterações foram salvas."
       });
     }
   };
 
-  return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* Top navigation */}
-      <header className="border-b p-4 bg-card">
-        <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <DollarSign className="h-6 w-6 text-comeco-purple" />
-            <h1 className="text-xl font-bold">FinançaFácil</h1>
-          </div>
+  // Get events for the selected date
+  const getEventsForSelectedDate = () => {
+    if (!selectedDate) return [];
+    
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    return datesWithEvents[dateStr] || [];
+  };
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:block">
-            <NavigationMenu>
-              <NavigationMenuList>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className={navigationMenuTriggerStyle()}
-                    onClick={() => navigateTo('/')}
-                  >
-                    Visão Geral
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className={navigationMenuTriggerStyle()}
-                    onClick={() => navigateTo('/accounts-categories')}
-                  >
-                    Contas e Categorias
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className={navigationMenuTriggerStyle()}
-                    onClick={() => navigateTo('/calendar')}
-                  >
-                    Calendário
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className={navigationMenuTriggerStyle()}
-                    onClick={() => navigateTo('/reports')}
-                  >
-                    Relatórios
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className={navigationMenuTriggerStyle()}
-                    onClick={() => navigateTo('/settings')}
-                  >
-                    Configurações
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-              </NavigationMenuList>
-            </NavigationMenu>
-          </nav>
+  // Get color for event type
+  const getEventTypeColor = (type: string) => {
+    switch (type) {
+      case 'income': return 'bg-green-500';
+      case 'expense': return 'bg-red-500';
+      case 'invoice': return 'bg-purple-500';
+      default: return 'bg-gray-500';
+    }
+  };
 
-          {/* Mobile menu button */}
-          <button 
-            className="md:hidden flex items-center" 
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            <MenuIcon className="h-6 w-6" />
-          </button>
+  // Get icon for event type
+  const getEventTypeIcon = (type: string) => {
+    switch (type) {
+      case 'income': return <DollarSign className="h-4 w-4" />;
+      case 'expense': return <AlertCircle className="h-4 w-4" />;
+      case 'invoice': return <CreditCard className="h-4 w-4" />;
+      default: return <CalendarIcon className="h-4 w-4" />;
+    }
+  };
+
+  // Create a date renderer for the calendar
+  const renderDate = (day: Date) => {
+    const dateStr = format(day, 'yyyy-MM-dd');
+    const hasEvents = dateStr in datesWithEvents;
+    
+    return (
+      <div className="relative w-full h-full">
+        <div className={`absolute inset-0 flex items-center justify-center ${isToday(day) ? 'font-bold' : ''}`}>
+          {format(day, 'd')}
         </div>
-
-        {/* Mobile Navigation */}
-        {mobileMenuOpen && (
-          <div className="md:hidden mt-4 border-t pt-4">
-            <div className="flex flex-col gap-4">
-              <button 
-                className="text-left px-4 py-2 hover:bg-accent rounded-md"
-                onClick={() => navigateTo('/')}
-              >
-                Visão Geral
-              </button>
-              <button 
-                className="text-left px-4 py-2 hover:bg-accent rounded-md"
-                onClick={() => navigateTo('/accounts-categories')}
-              >
-                Contas e Categorias
-              </button>
-              <button 
-                className="text-left px-4 py-2 hover:bg-accent rounded-md"
-                onClick={() => navigateTo('/calendar')}
-              >
-                Calendário
-              </button>
-              <button 
-                className="text-left px-4 py-2 hover:bg-accent rounded-md"
-                onClick={() => navigateTo('/reports')}
-              >
-                Relatórios
-              </button>
-              <button 
-                className="text-left px-4 py-2 hover:bg-accent rounded-md"
-                onClick={() => navigateTo('/settings')}
-              >
-                Configurações
-              </button>
-            </div>
+        {hasEvents && (
+          <div className="absolute bottom-1 left-0 right-0 flex justify-center space-x-1">
+            {datesWithEvents[dateStr].slice(0, 3).map((event, i) => (
+              <div
+                key={i}
+                className={`h-1.5 w-1.5 rounded-full ${getEventTypeColor(event.type)}`}
+              />
+            ))}
+            {datesWithEvents[dateStr].length > 3 && (
+              <div className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+            )}
           </div>
         )}
-      </header>
+      </div>
+    );
+  };
 
-      {/* Main content */}
-      <main className="container mx-auto py-6 px-4">
-        <div className="flex items-center gap-2 mb-6">
-          <Button variant="outline" size="icon" onClick={() => navigateTo('/')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h2 className="text-2xl font-bold">Calendário Financeiro</h2>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Calendar */}
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Calendário</CardTitle>
-              <CardDescription>
-                Gerencie suas contas a pagar e receber, faturas e outros eventos financeiros
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col md:flex-row md:justify-center gap-6">
-                <div className="flex justify-center">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={handleDateSelect}
-                    className="rounded-md border"
-                  />
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium mb-3">
-                    {date ? date.toLocaleDateString('pt-BR', { 
-                      weekday: 'long', 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    }) : 'Selecione uma data'}
-                  </h3>
-                  
-                  {date && (
-                    <>
-                      <div className="space-y-2 mb-4">
-                        <h4 className="text-sm font-medium text-muted-foreground">Eventos para esta data:</h4>
-                        {getEventsForDate(date).length > 0 ? (
-                          <div className="space-y-2">
-                            {getEventsForDate(date).map(event => (
-                              <div 
-                                key={event.id} 
-                                className="p-3 border rounded-lg hover:bg-accent/30 cursor-pointer"
-                                onClick={() => setEditingEvent(event)}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <div className={`w-3 h-3 rounded-full ${getEventColor(event.type)}`} />
-                                  <h5 className="font-medium">{event.title}</h5>
-                                </div>
-                                <div className="flex justify-between mt-1">
-                                  <span className="text-sm text-muted-foreground">
-                                    {getEventTypeText(event.type)}
-                                  </span>
-                                  <span className={`text-sm font-medium ${
-                                    event.type === 'income' ? 'text-green-600' : 
-                                    event.type === 'expense' || event.type === 'invoice' ? 'text-red-600' :
-                                    'text-muted-foreground'
-                                  }`}>
-                                    {event.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                  </span>
-                                </div>
-                                {event.description && (
-                                  <p className="text-xs text-muted-foreground mt-1">{event.description}</p>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-center text-sm text-muted-foreground py-4">
-                            Nenhum evento para esta data.
-                          </p>
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-6">Calendário Financeiro</h1>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Calendar */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>
+                {format(date, 'MMMM yyyy', { locale: ptBR })}
+              </CardTitle>
+              <div className="flex gap-2">
+                <Button variant="outline" size="icon" onClick={handlePreviousMonth}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" onClick={handleNextMonth}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="p-1 bg-background rounded-lg">
+              <CalendarComponent
+                mode="single"
+                selected={selectedDate}
+                onSelect={handleDaySelect}
+                month={date}
+                className="w-full"
+                disabled={false}
+              />
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-end">
+            <Button 
+              className="flex items-center gap-2" 
+              onClick={() => {
+                setNewEvent({
+                  ...newEvent,
+                  date: format(selectedDate || new Date(), 'yyyy-MM-dd')
+                });
+                setIsAddEventDialogOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              Adicionar Evento
+            </Button>
+          </CardFooter>
+        </Card>
+        
+        {/* Events for selected date */}
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {selectedDate 
+                ? format(selectedDate, "d 'de' MMMM", { locale: ptBR })
+                : "Selecione uma data"}
+            </CardTitle>
+            <CardDescription>
+              Eventos programados para esta data
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[300px]">
+              {getEventsForSelectedDate().length > 0 ? (
+                <div className="space-y-4">
+                  {getEventsForSelectedDate().map((event) => (
+                    <div 
+                      key={event.id}
+                      onClick={() => {
+                        setSelectedEvent(event);
+                        setIsViewEventDialogOpen(true);
+                      }}
+                      className="p-3 border rounded-lg cursor-pointer hover:bg-accent transition-colors flex items-start gap-3"
+                    >
+                      <div className={`rounded-full p-2 ${getEventTypeColor(event.type)} text-white`}>
+                        {getEventTypeIcon(event.type)}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium">{event.title}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {event.recurrence === 'once' ? 'Uma vez' : 
+                           event.recurrence === 'weekly' ? 'Semanal' : 'Mensal'}
+                        </p>
+                        {event.description && (
+                          <p className="text-sm mt-1 line-clamp-2">{event.description}</p>
                         )}
                       </div>
-                      
-                      <Button 
-                        className="w-full"
-                        onClick={() => {
-                          setNewEvent({
-                            ...newEvent,
-                            date: date.toISOString().split('T')[0]
-                          });
-                          setShowDialog(true);
-                        }}
-                      >
-                        <Plus className="mr-2 h-4 w-4" /> Adicionar Evento
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Events List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Todos os Eventos</CardTitle>
-              <CardDescription>
-                Busque e gerencie todos os seus eventos financeiros
-              </CardDescription>
-              <div className="relative mt-2">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar eventos..."
-                  className="pl-8"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                {searchQuery && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full"
-                    onClick={() => setSearchQuery("")}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
-                {getFilteredEvents().length > 0 ? (
-                  getFilteredEvents().map(event => (
-                    <div 
-                      key={event.id} 
-                      className="p-3 border rounded-lg hover:bg-accent/30 cursor-pointer"
-                      onClick={() => setEditingEvent(event)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className={`w-3 h-3 rounded-full ${getEventColor(event.type)}`} />
-                        <h5 className="font-medium">{event.title}</h5>
-                      </div>
-                      <div className="flex justify-between mt-1">
-                        <span className="text-sm text-muted-foreground">
-                          {new Date(event.date).toLocaleDateString('pt-BR')} • {getEventTypeText(event.type)}
-                        </span>
-                        <span className={`text-sm font-medium ${
-                          event.type === 'income' ? 'text-green-600' : 
-                          event.type === 'expense' || event.type === 'invoice' ? 'text-red-600' :
-                          'text-muted-foreground'
-                        }`}>
-                          {event.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </span>
+                      <div className={`text-right font-medium ${
+                        event.type === 'income' ? 'text-green-600' : 
+                        event.type === 'expense' ? 'text-red-600' : 'text-purple-600'
+                      }`}>
+                        {(event.type === 'income' ? '+' : '') + 
+                          event.amount.toLocaleString('pt-BR', { 
+                            style: 'currency', 
+                            currency: 'BRL' 
+                          })
+                        }
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <p className="text-center text-sm text-muted-foreground py-4">
-                    {searchQuery ? "Nenhum evento encontrado." : "Nenhum evento cadastrado."}
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-
-      {/* Add/Edit Event Dialog */}
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-10 text-muted-foreground">
+                  <CalendarIcon className="mx-auto h-12 w-12 opacity-20 mb-2" />
+                  <p>Nenhum evento para esta data</p>
+                  <Button 
+                    variant="link" 
+                    onClick={() => {
+                      setNewEvent({
+                        ...newEvent,
+                        date: format(selectedDate || new Date(), 'yyyy-MM-dd')
+                      });
+                      setIsAddEventDialogOpen(true);
+                    }}
+                  >
+                    Adicionar evento
+                  </Button>
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Add Event Dialog */}
+      <Dialog open={isAddEventDialogOpen} onOpenChange={setIsAddEventDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Adicionar Evento Financeiro</DialogTitle>
+            <DialogTitle>Adicionar Evento</DialogTitle>
             <DialogDescription>
-              Adicione um novo evento ao seu calendário financeiro
+              Adicione um novo evento financeiro ao calendário.
             </DialogDescription>
           </DialogHeader>
-          
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="title">Título</Label>
-              <Input 
-                id="title" 
-                name="title"
-                placeholder="Ex: Pagamento de Aluguel" 
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="title" className="text-right">
+                Título
+              </Label>
+              <Input
+                id="title"
+                placeholder="Nome do evento"
+                className="col-span-3"
                 value={newEvent.title}
-                onChange={handleEventChange}
+                onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
               />
             </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="date">Data</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {newEvent.date ? new Date(newEvent.date).toLocaleDateString('pt-BR') : "Selecione uma data"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={new Date(newEvent.date)}
-                    onSelect={(date) => date && setNewEvent({
-                      ...newEvent,
-                      date: date.toISOString().split('T')[0]
-                    })}
-                  />
-                </PopoverContent>
-              </Popover>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="date" className="text-right">
+                Data
+              </Label>
+              <Input
+                id="date"
+                type="date"
+                className="col-span-3"
+                value={newEvent.date}
+                onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+              />
             </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="amount">Valor</Label>
-              <Input 
-                id="amount" 
-                name="amount"
-                type="number" 
-                placeholder="0.00" 
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="amount" className="text-right">
+                Valor
+              </Label>
+              <Input
+                id="amount"
+                type="number"
+                placeholder="0,00"
+                className="col-span-3"
                 value={newEvent.amount}
-                onChange={handleEventChange}
+                onChange={(e) => setNewEvent({ ...newEvent, amount: parseFloat(e.target.value) || 0 })}
               />
             </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="type">Tipo</Label>
-              <Select 
-                defaultValue={newEvent.type}
-                onValueChange={(value) => setNewEvent({...newEvent, type: value as EventType})}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="type" className="text-right">
+                Tipo
+              </Label>
+              <Select
+                value={newEvent.type}
+                onValueChange={(value) => setNewEvent({ ...newEvent, type: value as any })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Selecione o tipo" />
                 </SelectTrigger>
                 <SelectContent>
@@ -621,116 +401,100 @@ const FinancialCalendar = () => {
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="recurrence">Recorrência</Label>
-              <Select 
-                defaultValue={newEvent.recurrence}
-                onValueChange={(value) => setNewEvent({...newEvent, recurrence: value as RecurrenceType})}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="recurrence" className="text-right">
+                Recorrência
+              </Label>
+              <Select
+                value={newEvent.recurrence}
+                onValueChange={(value) => setNewEvent({ ...newEvent, recurrence: value as any })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Selecione a recorrência" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="once">Única vez</SelectItem>
+                  <SelectItem value="once">Uma vez</SelectItem>
                   <SelectItem value="weekly">Semanal</SelectItem>
                   <SelectItem value="monthly">Mensal</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="description">Descrição (opcional)</Label>
-              <Input 
-                id="description" 
-                name="description"
-                placeholder="Descrição ou notas sobre este evento" 
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="description" className="text-right">
+                Descrição
+              </Label>
+              <Input
+                id="description"
+                placeholder="Descrição opcional"
+                className="col-span-3"
                 value={newEvent.description || ''}
-                onChange={handleEventChange}
+                onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
               />
             </div>
           </div>
-          
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={addEvent}>
-              Adicionar Evento
-            </Button>
+            <Button variant="outline" onClick={() => setIsAddEventDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleCreateEvent} disabled={!newEvent.title || newEvent.amount <= 0}>Adicionar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Edit Event Dialog */}
-      {editingEvent && (
-        <Dialog open={!!editingEvent} onOpenChange={() => setEditingEvent(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Editar Evento</DialogTitle>
-              <DialogDescription>
-                Atualize os detalhes do seu evento financeiro
-              </DialogDescription>
-            </DialogHeader>
-            
+      
+      {/* View/Edit Event Dialog */}
+      <Dialog open={isViewEventDialogOpen} onOpenChange={setIsViewEventDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Evento</DialogTitle>
+            <DialogDescription>
+              Visualize ou edite este evento financeiro.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedEvent && (
             <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-title">Título</Label>
-                <Input 
-                  id="edit-title" 
-                  name="title"
-                  value={editingEvent.title}
-                  onChange={handleEventChange}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="view-title" className="text-right">
+                  Título
+                </Label>
+                <Input
+                  id="view-title"
+                  className="col-span-3"
+                  value={selectedEvent.title}
+                  onChange={(e) => setSelectedEvent({ ...selectedEvent, title: e.target.value })}
                 />
               </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit-date">Data</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {editingEvent.date ? new Date(editingEvent.date).toLocaleDateString('pt-BR') : "Selecione uma data"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={new Date(editingEvent.date)}
-                      onSelect={(date) => date && setEditingEvent({
-                        ...editingEvent,
-                        date: date.toISOString().split('T')[0]
-                      })}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit-amount">Valor</Label>
-                <Input 
-                  id="edit-amount" 
-                  name="amount"
-                  type="number" 
-                  value={editingEvent.amount}
-                  onChange={handleEventChange}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="view-date" className="text-right">
+                  Data
+                </Label>
+                <Input
+                  id="view-date"
+                  type="date"
+                  className="col-span-3"
+                  value={selectedEvent.date}
+                  onChange={(e) => setSelectedEvent({ ...selectedEvent, date: e.target.value })}
                 />
               </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit-type">Tipo</Label>
-                <Select 
-                  value={editingEvent.type}
-                  onValueChange={(value) => setEditingEvent({
-                    ...editingEvent, 
-                    type: value as EventType
-                  })}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="view-amount" className="text-right">
+                  Valor
+                </Label>
+                <Input
+                  id="view-amount"
+                  type="number"
+                  className="col-span-3"
+                  value={selectedEvent.amount}
+                  onChange={(e) => setSelectedEvent({ ...selectedEvent, amount: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="view-type" className="text-right">
+                  Tipo
+                </Label>
+                <Select
+                  value={selectedEvent.type}
+                  onValueChange={(value) => setSelectedEvent({ ...selectedEvent, type: value as any })}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o tipo" />
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="income">Receita</SelectItem>
@@ -740,75 +504,53 @@ const FinancialCalendar = () => {
                   </SelectContent>
                 </Select>
               </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit-recurrence">Recorrência</Label>
-                <Select 
-                  value={editingEvent.recurrence}
-                  onValueChange={(value) => setEditingEvent({
-                    ...editingEvent, 
-                    recurrence: value as RecurrenceType
-                  })}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="view-recurrence" className="text-right">
+                  Recorrência
+                </Label>
+                <Select
+                  value={selectedEvent.recurrence}
+                  onValueChange={(value) => setSelectedEvent({ ...selectedEvent, recurrence: value as any })}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a recorrência" />
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="once">Única vez</SelectItem>
+                    <SelectItem value="once">Uma vez</SelectItem>
                     <SelectItem value="weekly">Semanal</SelectItem>
                     <SelectItem value="monthly">Mensal</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="edit-description">Descrição (opcional)</Label>
-                <Input 
-                  id="edit-description" 
-                  name="description"
-                  value={editingEvent.description || ''}
-                  onChange={handleEventChange}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="view-description" className="text-right">
+                  Descrição
+                </Label>
+                <Input
+                  id="view-description"
+                  className="col-span-3"
+                  value={selectedEvent.description || ''}
+                  onChange={(e) => setSelectedEvent({ ...selectedEvent, description: e.target.value })}
                 />
               </div>
             </div>
-            
-            <DialogFooter className="flex flex-col sm:flex-row gap-2">
-              <Button
-                variant="destructive"
-                onClick={() => deleteEvent(editingEvent.id)}
-              >
-                <Trash className="mr-2 h-4 w-4" /> Excluir
-              </Button>
-              <Button onClick={updateEvent}>
-                <Save className="mr-2 h-4 w-4" /> Salvar Alterações
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Footer with theme toggle */}
-      <footer className="border-t p-4 mt-auto bg-card">
-        <div className="container mx-auto flex justify-between items-center">
-          <div>
-            <p className="text-sm">© 2023 FinançaFácil</p>
-          </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={toggleDarkMode}
-            className="fixed bottom-4 left-4 z-50 bg-card border shadow-md"
-          >
-            {darkMode ? (
-              <Sun className="h-5 w-5" />
-            ) : (
-              <Moon className="h-5 w-5" />
-            )}
-          </Button>
-        </div>
-      </footer>
+          )}
+          <DialogFooter className="flex justify-between sm:justify-between">
+            <Button 
+              variant="destructive" 
+              onClick={() => selectedEvent && handleDeleteEvent(selectedEvent.id)}
+            >
+              Excluir
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setIsViewEventDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleUpdateEvent}>Salvar</Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
-export default FinancialCalendar;
+export default CalendarPage;
