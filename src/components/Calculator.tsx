@@ -118,7 +118,7 @@ export const Calculator: React.FC = () => {
           
           <Button variant="outline" onClick={() => inputDigit('0')} className="col-span-2">0</Button>
           <Button variant="outline" onClick={inputDot}>.</Button>
-          <Button variant="primary" onClick={handleEquals}>=</Button>
+          <Button variant="default" onClick={handleEquals}>=</Button>
         </div>
       </CardContent>
     </Card>
