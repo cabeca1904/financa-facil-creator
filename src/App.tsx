@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect } from "react";
 import { useLocalStorage } from "./hooks/use-local-storage";
-import LoginForm from "./components/LoginForm";
+import SimpleLoginForm from "./components/SimpleLoginForm";
 import NavBar from "./components/NavBar";
 import Index from "./pages/Index";
 import AccountsCategories from "./pages/AccountsCategories";
@@ -48,7 +48,7 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           {!user.isLoggedIn ? (
-            <LoginForm onLogin={handleLogin} />
+            <SimpleLoginForm onLogin={handleLogin} />
           ) : (
             <>
               <NavBar onLogout={handleLogout} user={user} />

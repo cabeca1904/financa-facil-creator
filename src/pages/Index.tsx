@@ -11,6 +11,7 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
+  CreditCard
 } from 'lucide-react';
 import { useLocalStorage } from '../hooks/use-local-storage';
 import { 
@@ -31,12 +32,16 @@ import {
 } from '@/components/ui/chart';
 import { 
   ResponsiveContainer, 
-  PieChart as RechartsPieChart, 
-  Pie, 
-  Cell, 
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   Tooltip, 
   Legend 
 } from 'recharts';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calculator } from "@/components/Calculator";
 
 // Types for our application
 type TransactionType = 'expense';
@@ -47,9 +52,8 @@ interface Transaction {
   description: string;
   amount: number;
   date: string;
-  category: string;
-  type: TransactionType;
   accountId: string;
+  type: TransactionType;
 }
 
 interface Account {
@@ -58,14 +62,7 @@ interface Account {
   balance: number;
   type: AccountType;
   color: string;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  color: string;
-  type: TransactionType;
-  budget?: number;
+  closeDate?: string; // Date for credit card billing cycle close
 }
 
 interface CalendarEvent {
@@ -103,15 +100,7 @@ interface DashboardProps {
 const initialAccounts: Account[] = [
   { id: '1', name: 'Conta Principal', balance: 5000, type: 'bank', color: '#3B82F6' },
   { id: '2', name: 'Dinheiro', balance: 500, type: 'cash', color: '#10B981' },
-  { id: '3', name: 'Cartão de Crédito', balance: -1500, type: 'credit', color: '#EF4444' },
-];
-
-const initialCategories: Category[] = [
-  { id: '2', name: 'Alimentação', color: '#F59E0B', type: 'expense', budget: 1000 },
-  { id: '3', name: 'Transporte', color: '#3B82F6', type: 'expense', budget: 500 },
-  { id: '4', name: 'Moradia', color: '#8B5CF6', type: 'expense', budget: 1500 },
-  { id: '5', name: 'Lazer', color: '#EC4899', type: 'expense', budget: 300 },
-  { id: '6', name: 'Saúde', color: '#EF4444', type: 'expense', budget: 400 },
+  { id: '3', name: 'Cartão de Crédito', balance: -1500, type: 'credit', color: '#EF4444', closeDate: '2023-12-25' },
 ];
 
 const initialTransactions: Transaction[] = [
@@ -120,7 +109,6 @@ const initialTransactions: Transaction[] = [
     description: 'Supermercado',
     amount: 350,
     date: '2023-12-10',
-    category: '2',
     type: 'expense',
     accountId: '1',
   },
@@ -129,7 +117,6 @@ const initialTransactions: Transaction[] = [
     description: 'Gasolina',
     amount: 200,
     date: '2023-12-12',
-    category: '3',
     type: 'expense',
     accountId: '2',
   },
@@ -138,7 +125,6 @@ const initialTransactions: Transaction[] = [
     description: 'Aluguel',
     amount: 1200,
     date: '2023-12-15',
-    category: '4',
     type: 'expense',
     accountId: '1',
   },
@@ -168,10 +154,10 @@ const initialCalendarEvents: CalendarEvent[] = [
 const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
   // State management with localStorage persistence
   const [accounts, setAccounts] = useLocalStorage('accounts', initialAccounts);
-  const [categories, setCategories] = useLocalStorage('categories', initialCategories);
   const [transactions, setTransactions] = useLocalStorage('transactions', initialTransactions);
   const [calendarEvents, setCalendarEvents] = useLocalStorage('calendarEvents', initialCalendarEvents);
   const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
+  const [showCalculator, setShowCalculator] = useState(false);
   
   const navigate = useNavigate();
 
@@ -242,25 +228,22 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
     .filter(item => !item.isPaid)
     .reduce((sum, item) => sum + item.amount, 0);
 
-  // Prepare data for pie chart - category distribution
-  const categoryExpenseData = categories
-    .filter(category => category.type === 'expense')
-    .map(category => {
-      const total = transactions
-        .filter(
-          transaction => 
-            transaction.category === category.id && 
-            transaction.type === 'expense'
-        )
+  // Prepare data for credit card usage chart
+  const creditCardUsageData = accounts
+    .filter(account => account.type === 'credit')
+    .map(account => {
+      const totalUsage = transactions
+        .filter(transaction => transaction.accountId === account.id)
         .reduce((sum, transaction) => sum + transaction.amount, 0);
       
       return {
-        name: category.name,
-        value: total,
-        color: category.color,
+        name: account.name,
+        usage: Math.abs(totalUsage),
+        limit: Math.abs(account.balance),
+        color: account.color,
+        closeDate: account.closeDate || 'N/A'
       };
-    })
-    .filter(item => item.value > 0);
+    });
 
   // Mark pending item as paid
   const markAsPaid = (id: string) => {
@@ -317,45 +300,58 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
 
         {/* Charts and pending items */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Pie chart */}
+          {/* Credit Card Usage Chart */}
           <Card>
             <CardHeader>
-              <CardTitle>Distribuição por Categoria</CardTitle>
-              <CardDescription>Despesas por categoria</CardDescription>
+              <CardTitle>Uso de Cartão de Crédito</CardTitle>
+              <CardDescription>Faturas e datas de fechamento</CardDescription>
             </CardHeader>
             <CardContent className="h-80">
-              <ChartContainer
-                config={{
-                  expense: { label: "Despesas", color: "#EF4444" },
-                }}
-                className="h-full"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsPieChart>
-                    <Pie
-                      data={categoryExpenseData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
+              {creditCardUsageData.length > 0 ? (
+                <ChartContainer
+                  config={{
+                    usage: { label: "Utilizado", color: "#EF4444" },
+                    limit: { label: "Limite", color: "#3B82F6" },
+                  }}
+                  className="h-full"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={creditCardUsageData}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                     >
-                      {categoryExpenseData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      formatter={(value) => [
-                        value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-                        'Valor'
-                      ]} 
-                    />
-                    <Legend />
-                  </RechartsPieChart>
-                </ResponsiveContainer>
-              </ChartContainer>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip 
+                        formatter={(value) => [
+                          value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+                          'Valor'
+                        ]}
+                        labelFormatter={(label) => {
+                          const card = creditCardUsageData.find(card => card.name === label);
+                          return `${label} - Fecha em: ${card?.closeDate}`;
+                        }}
+                      />
+                      <Legend />
+                      <Bar dataKey="usage" name="Utilizado" fill="#EF4444" />
+                      <Bar dataKey="limit" name="Limite" fill="#3B82F6" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full">
+                  <CreditCard className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-center text-muted-foreground mb-4">
+                    Você não possui cartões de crédito cadastrados.
+                  </p>
+                  <Button 
+                    onClick={() => navigateTo('/accounts-categories')}
+                  >
+                    Adicionar Cartão
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -440,7 +436,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
             onClick={() => navigateTo('/accounts-categories')}
           >
             <Plus className="h-4 w-4" />
-            Gerenciar Contas e Categorias
+            Gerenciar Contas
           </Button>
           <Button 
             className="flex items-center gap-2" 
@@ -458,6 +454,26 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout, user }) => {
           </Button>
         </div>
       </main>
+
+      {/* Calculator Popover */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button 
+            variant="outline" 
+            className="fixed bottom-4 right-4 rounded-full p-3"
+            aria-label="Calculadora"
+          >
+            <span className="sr-only">Calculadora</span>
+            <img src="/calculator-icon.svg" alt="Calculadora" className="w-6 h-6" onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calculator"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/></svg>';
+            }} />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-80">
+          <Calculator />
+        </PopoverContent>
+      </Popover>
     </div>
   );
 };
